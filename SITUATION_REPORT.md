@@ -1,10 +1,25 @@
 # Situation Report — Custom Flipper-ARF + Momentum Fork
 
+**Source code (diff-only, no upstream Momentum):** https://github.com/shuka0158/ARF-Shuka-Edition
+
 **User:** shuka0158 (GitHub) / shukakidze.davit2010@gmail.com
 **Date:** 2026-05-28
 **OS:** Linux Mint 22.1, Kernel 6.8.0-111
 **qFlipper version:** 1.3.3-1build2 (2024-04-01)
-**Status:** Flipper Zero unresponsive — no charging LED, no screen, no LEDs at all
+**Status:** ✅ RESOLVED — see Resolution section at the bottom.
+
+## Resolution (added after community help)
+
+Fixed by **d4rk$1d3** and **z4men** in the Flipper-ARF Discord:
+
+1. Disconnect Flipper from USB entirely.
+2. Press and **hold BACK for 30–35 seconds** while disconnected. This resets the power-management circuit (BMS lockout / PMIC state).
+3. After ~30s, connect to PC. Screen stays black (correct), and **qFlipper detects "Recovery"** mode.
+4. From recovery, install stock Momentum/Unleashed/etc. — device fully restored.
+
+### Lesson learned (recorded for future builders)
+
+> **NEVER compile with `COPRO_DISCLAIMER=--I-understand-what-I-am-doing=yes`** unless you have an explicit, very specific reason. This flag bypasses the firmware-image-overlaps-C2-region safety check in `scripts/update.py`. With this flag enabled and a firmware too large to fit under the radio binary, the resulting `.tgz` is "valid" enough that the on-device updater attempts to flash it — even though qFlipper still refuses the bare `.dfu`. Without the flag, the build would have errored out before producing artifacts at all, which is what you want when your firmware doesn't fit. — community guidance from d4rk$1d3
 
 ---
 
