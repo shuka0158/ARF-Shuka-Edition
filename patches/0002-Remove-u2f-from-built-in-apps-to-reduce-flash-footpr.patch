@@ -1,0 +1,25 @@
+From 59a0a0ca5b316dd702118c3ce975898bba493fed Mon Sep 17 00:00:00 2001
+From: shuka0158 <shukakidze.davit2010@gmail.com>
+Date: Thu, 28 May 2026 15:42:11 +0400
+Subject: [PATCH 2/2] Remove u2f from built-in apps to reduce flash footprint
+
+---
+ applications/main/application.fam | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/applications/main/application.fam b/applications/main/application.fam
+index 82c297c..1d843c2 100644
+--- a/applications/main/application.fam
++++ b/applications/main/application.fam
+@@ -10,7 +10,7 @@ App(
+         "nfc",
+         "subghz",
+         "bad_kb",
+-        "u2f",
++        # u2f removed in ARF Custom edition to free flash space for ARF protocols
+         "momentum_app",
+         "archive",
+         "main_apps_on_start",
+-- 
+2.43.0
+
