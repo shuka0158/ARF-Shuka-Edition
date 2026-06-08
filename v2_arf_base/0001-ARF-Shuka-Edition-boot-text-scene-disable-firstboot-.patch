@@ -1,0 +1,132 @@
+From 6f04831359bb23df83e304220e8c902343b2ee29 Mon Sep 17 00:00:00 2001
+From: shuka0158 <shukakidze.davit2010@gmail.com>
+Date: Thu, 28 May 2026 19:32:08 +0400
+Subject: [PATCH] ARF Shuka Edition: boot text scene + disable firstboot
+ animation
+
+- Add desktop_scene_boot_text.c that shows 'ARF Custom edition.' /
+  'GitHub: shuka0158' for 2.5 seconds on every boot via the popup view
+- Register scene in desktop_scene_config.h + DesktopBootTextExit event
+- Push DesktopSceneBootText on top of DesktopSceneMain at desktop startup
+- Replace the firstboot/update slideshow trigger with storage_common_remove
+  so no dolphin animation plays at boot
+
+Result: firmware fits cleanly under BLE_Stack_light radio
+(854 KB / 880 KB limit, ~26 KB headroom). Clean build, no disclaimer
+flag, no overlap warning, qFlipper-flashable .dfu.
+---
+ applications/services/desktop/desktop.c       |  8 +--
+ .../desktop/scenes/desktop_scene_boot_text.c  | 50 +++++++++++++++++++
+ .../desktop/scenes/desktop_scene_config.h     |  1 +
+ .../services/desktop/views/desktop_events.h   |  2 +
+ 4 files changed, 57 insertions(+), 4 deletions(-)
+ create mode 100644 applications/services/desktop/scenes/desktop_scene_boot_text.c
+
+diff --git a/applications/services/desktop/desktop.c b/applications/services/desktop/desktop.c
+index 2c9a443..13af87a 100644
+--- a/applications/services/desktop/desktop.c
++++ b/applications/services/desktop/desktop.c
+@@ -505,6 +505,7 @@ int32_t desktop_srv(void* p) {
+     desktop_init_settings(desktop);
+ 
+     scene_manager_next_scene(desktop->scene_manager, DesktopSceneMain);
++    scene_manager_next_scene(desktop->scene_manager, DesktopSceneBootText);
+ 
+     if(desktop_pin_code_is_set()) {
+         desktop_lock(desktop);
+@@ -514,11 +515,10 @@ int32_t desktop_srv(void* p) {
+         furi_record_close(RECORD_CLI_VCP);
+     }
+ 
++    // ARF Shuka Edition: firstboot/update slideshow disabled in favor of boot text scene.
+     if(storage_file_exists(desktop->storage, SLIDESHOW_FS_PATH)) {
+-        scene_manager_next_scene(desktop->scene_manager, DesktopSceneSlideshow);
+-    } //else {
+-        //scene_manager_next_scene(desktop->scene_manager, DesktopSceneTos);
+-    //}
++        storage_common_remove(desktop->storage, SLIDESHOW_FS_PATH);
++    }
+ 
+     if(!furi_hal_version_do_i_belong_here()) {
+         scene_manager_next_scene(desktop->scene_manager, DesktopSceneHwMismatch);
+diff --git a/applications/services/desktop/scenes/desktop_scene_boot_text.c b/applications/services/desktop/scenes/desktop_scene_boot_text.c
+new file mode 100644
+index 0000000..c5c565f
+--- /dev/null
++++ b/applications/services/desktop/scenes/desktop_scene_boot_text.c
+@@ -0,0 +1,50 @@
++#include <gui/scene_manager.h>
++#include <furi.h>
++
++#include "desktop_scene.h"
++#include "../desktop_i.h"
++
++#define BOOT_TEXT_TIMEOUT_MS 2500
++
++void desktop_scene_boot_text_callback(void* context) {
++    Desktop* desktop = (Desktop*)context;
++    view_dispatcher_send_custom_event(desktop->view_dispatcher, DesktopBootTextExit);
++}
++
++void desktop_scene_boot_text_on_enter(void* context) {
++    Desktop* desktop = (Desktop*)context;
++    furi_assert(desktop);
++    Popup* popup = desktop->popup;
++
++    popup_set_context(popup, desktop);
++    popup_set_header(
++        popup, "ARF Custom edition.", 64, 14 + STATUS_BAR_Y_SHIFT, AlignCenter, AlignBottom);
++    popup_set_text(
++        popup, "GitHub: shuka0158", 64, 36 + STATUS_BAR_Y_SHIFT, AlignCenter, AlignCenter);
++    popup_set_callback(popup, desktop_scene_boot_text_callback);
++    popup_set_timeout(popup, BOOT_TEXT_TIMEOUT_MS);
++    popup_enable_timeout(popup);
++    view_dispatcher_switch_to_view(desktop->view_dispatcher, DesktopViewIdPopup);
++}
++
++bool desktop_scene_boot_text_on_event(void* context, SceneManagerEvent event) {
++    Desktop* desktop = (Desktop*)context;
++    bool consumed = false;
++
++    if(event.type == SceneManagerEventTypeCustom) {
++        if(event.event == DesktopBootTextExit) {
++            scene_manager_previous_scene(desktop->scene_manager);
++            consumed = true;
++        }
++    }
++    return consumed;
++}
++
++void desktop_scene_boot_text_on_exit(void* context) {
++    Desktop* desktop = (Desktop*)context;
++    furi_assert(desktop);
++
++    Popup* popup = desktop->popup;
++    popup_disable_timeout(popup);
++    popup_reset(popup);
++}
+diff --git a/applications/services/desktop/scenes/desktop_scene_config.h b/applications/services/desktop/scenes/desktop_scene_config.h
+index 2a53660..4e62931 100644
+--- a/applications/services/desktop/scenes/desktop_scene_config.h
++++ b/applications/services/desktop/scenes/desktop_scene_config.h
+@@ -8,3 +8,4 @@ ADD_SCENE(desktop, pin_input, PinInput)
+ ADD_SCENE(desktop, pin_timeout, PinTimeout)
+ ADD_SCENE(desktop, slideshow, Slideshow)
+ ADD_SCENE(desktop, secure_enclave, SecureEnclave)
++ADD_SCENE(desktop, boot_text, BootText)
+diff --git a/applications/services/desktop/views/desktop_events.h b/applications/services/desktop/views/desktop_events.h
+index c819503..2f6bb9a 100644
+--- a/applications/services/desktop/views/desktop_events.h
++++ b/applications/services/desktop/views/desktop_events.h
+@@ -44,6 +44,8 @@ typedef enum {
+ 
+     DesktopEnclaveExit,
+ 
++    DesktopBootTextExit,
++
+     // Global events
+     DesktopGlobalBeforeAppStarted,
+     DesktopGlobalAfterAppFinished,
+-- 
+2.43.0
+

@@ -1,10 +1,46 @@
-# ARF Custom Edition
+# ARF Shuka Edition
 
-Custom Flipper Zero firmware combining **Flipper-ARF's automotive Sub-GHz protocols** with the **Momentum firmware's UI/UX**.
+Custom Flipper Zero firmware by **shuka0158** based on **Flipper-ARF**.
 
-Built by **shuka0158** on 2026-05-28.
+## 🎯 v2 (recommended, working) — `v2_arf_base/`
 
-**Status:** Built clean but device became unresponsive during flashing attempt. See [`SITUATION_REPORT.md`](SITUATION_REPORT.md) — looking for help from the ARF Discord community.
+Base = **Flipper-ARF** firmware (already has all 31 automotive protocols + AUT64 cipher + Pandora keeloq stuff + everything).
+On top: custom boot text scene replacing the firstboot dolphin animation with:
+
+> **ARF Custom edition.**
+> *GitHub: shuka0158*
+
+Shown for 2.5 seconds on every boot, then transitions to normal desktop.
+
+**Firmware size:** 854 KB (26 KB headroom under the BLE_Stack_light radio at 0x080D7000).
+**Status:** ✅ Clean build, no `--I-understand-what-I-am-doing` flag, no C2-overlap warning. qFlipper-flashable.
+
+### v2 contents
+- `ARF-Shuka-Edition-v2.dfu` — 854 KB flashable .dfu (drag into qFlipper, "Install from file")
+- `ARF-Shuka-Edition-v2-update.tgz` — 1.9 MB full update bundle (firmware + radio + resources)
+- `0001-ARF-Shuka-Edition-boot-text-scene-disable-firstboot-.patch` — the diff against `D4C1-Labs/Flipper-ARF@main`, applies with `git am`
+- `desktop_scene_boot_text.c` — standalone new file (copy into `applications/services/desktop/scenes/`)
+
+### How to reproduce v2
+
+```bash
+git clone https://github.com/D4C1-Labs/Flipper-ARF.git
+cd Flipper-ARF
+git am /path/to/v2_arf_base/0001-*.patch
+./fbt COMPACT=1 DEBUG=0 updater_package
+# Output: dist/f7-C/flipper-z-f7-full-local.dfu
+```
+
+No special flags needed. Builds clean on first try.
+
+## 📝 v1 (historical, bricked attempt) — root of this repo
+
+Original attempt: Momentum-Firmware base + 31 ARF protocols ported on top.
+Result: 947 KB firmware (67 KB over the 880 KB radio limit), build required `--I-understand-what-I-am-doing=yes` to bypass the safety check, qFlipper refused the `.dfu`, and the device went into BMS lockout. Recovered via *hold BACK 30s without USB → reconnect → qFlipper recovery* (thanks d4rk$1d3 / z4men in the Flipper-ARF Discord).
+
+The v1 source-level changes are preserved in `patches/`, `new_files/`, `modified_files/` for archaeological interest. See [`SITUATION_REPORT.md`](SITUATION_REPORT.md) for the full story + lesson learned.
+
+**Lesson:** Don't combine the full Momentum kitchen-sink build with the full ARF protocol set — they don't fit together under the radio. Pick one base. For automotive research, ARF is the right base.
 
 ## What this is
 
