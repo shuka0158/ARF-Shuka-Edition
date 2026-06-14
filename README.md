@@ -126,10 +126,3 @@ To fix this properly: ~70 KB of firmware needs to be removed (suggestions welcom
 
 GPL-3.0 (inherited from both Flipper-ARF and Momentum-Firmware).
 
-## Help wanted
-
-If you're seeing this and have ideas for either:
-- Shrinking the firmware to fit under the 880 KB pre-radio limit while keeping ARF functionality
-- Recovering a Flipper Zero that's gone unresponsive (no charging LED, no enumeration) — see `SITUATION_REPORT.md`
-
-Please open an issue or contact via the ARF Discord.
