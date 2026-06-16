@@ -23,6 +23,16 @@ jobs:
           cd flipper-fw
           git submodule update --init --recursive --depth 1
 
+      - name: Stamp version string
+        run: |
+          cd flipper-fw
+          # fbt reads `git describe --tags --always` to build the string shown
+          # in Settings → About. Tag HEAD so it shows our name instead of ARF's.
+          GIT_COMMITTER_NAME="shuka0158" \
+          GIT_COMMITTER_EMAIL="noreply@github.com" \
+          git tag "ARF-Shuka-Edition"
+          git describe --tags --always
+
       - name: Add Shuka-Edition protocols on top of ARF
         run: |
           REPO=flipper-fw
