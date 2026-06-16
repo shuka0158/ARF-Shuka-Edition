@@ -40,7 +40,7 @@ static const SubGhzBlockConst subghz_protocol_toyota_const = {
 #define TOYOTA_BTN_PANIC        0x08u
 #define TOYOTA_BTN_REMOTE_START 0x10u
 
-struct SubGhzProtocolDecoderToyota {
+struct SubGhzProtocolDecoderToyotaLexus {
     SubGhzProtocolDecoderBase base;
     SubGhzBlockDecoder decoder;
     SubGhzBlockGeneric generic;
@@ -49,7 +49,7 @@ struct SubGhzProtocolDecoderToyota {
     bool crc_valid;
 };
 
-struct SubGhzProtocolEncoderToyota {
+struct SubGhzProtocolEncoderToyotaLexus {
     SubGhzProtocolEncoderBase base;
     SubGhzProtocolBlockEncoder encoder;
     SubGhzBlockGeneric generic;
@@ -62,33 +62,33 @@ typedef enum {
     ToyotaDecoderStepCheckDuration,
 } ToyotaDecoderStep;
 
-const SubGhzProtocolDecoder subghz_protocol_toyota_decoder = {
-    .alloc = subghz_protocol_decoder_toyota_alloc,
-    .free = subghz_protocol_decoder_toyota_free,
-    .feed = subghz_protocol_decoder_toyota_feed,
-    .reset = subghz_protocol_decoder_toyota_reset,
-    .get_hash_data = subghz_protocol_decoder_toyota_get_hash_data,
-    .serialize = subghz_protocol_decoder_toyota_serialize,
-    .deserialize = subghz_protocol_decoder_toyota_deserialize,
-    .get_string = subghz_protocol_decoder_toyota_get_string,
+const SubGhzProtocolDecoder subghz_protocol_toyota_lexus_decoder = {
+    .alloc = subghz_protocol_decoder_toyota_lexus_alloc,
+    .free = subghz_protocol_decoder_toyota_lexus_free,
+    .feed = subghz_protocol_decoder_toyota_lexus_feed,
+    .reset = subghz_protocol_decoder_toyota_lexus_reset,
+    .get_hash_data = subghz_protocol_decoder_toyota_lexus_get_hash_data,
+    .serialize = subghz_protocol_decoder_toyota_lexus_serialize,
+    .deserialize = subghz_protocol_decoder_toyota_lexus_deserialize,
+    .get_string = subghz_protocol_decoder_toyota_lexus_get_string,
 };
 
-const SubGhzProtocolEncoder subghz_protocol_toyota_encoder = {
-    .alloc = subghz_protocol_encoder_toyota_alloc,
-    .free = subghz_protocol_encoder_toyota_free,
-    .deserialize = subghz_protocol_encoder_toyota_deserialize,
-    .stop = subghz_protocol_encoder_toyota_stop,
-    .yield = subghz_protocol_encoder_toyota_yield,
+const SubGhzProtocolEncoder subghz_protocol_toyota_lexus_encoder = {
+    .alloc = subghz_protocol_encoder_toyota_lexus_alloc,
+    .free = subghz_protocol_encoder_toyota_lexus_free,
+    .deserialize = subghz_protocol_encoder_toyota_lexus_deserialize,
+    .stop = subghz_protocol_encoder_toyota_lexus_stop,
+    .yield = subghz_protocol_encoder_toyota_lexus_yield,
 };
 
-const SubGhzProtocol subghz_protocol_toyota = {
-    .name = TOYOTA_PROTOCOL_NAME,
+const SubGhzProtocol subghz_protocol_toyota_lexus = {
+    .name = TOYOTA_LEXUS_PROTOCOL_NAME,
     .type = SubGhzProtocolTypeDynamic,
     .flag = SubGhzProtocolFlag_315 | SubGhzProtocolFlag_433 | SubGhzProtocolFlag_AM |
             SubGhzProtocolFlag_Decodable | SubGhzProtocolFlag_Load | SubGhzProtocolFlag_Save |
             SubGhzProtocolFlag_Send,
-    .decoder = &subghz_protocol_toyota_decoder,
-    .encoder = &subghz_protocol_toyota_encoder,
+    .decoder = &subghz_protocol_toyota_lexus_decoder,
+    .encoder = &subghz_protocol_toyota_lexus_encoder,
 };
 
 // ─── CRC ────────────────────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ static uint8_t toyota_calculate_crc(uint64_t hi, uint8_t lo_byte) {
 
 // ─── Protocol data extraction ────────────────────────────────────────────────
 
-static void toyota_extract_fields(SubGhzProtocolDecoderToyota* instance) {
+static void toyota_extract_fields(SubGhzProtocolDecoderToyotaLexus* instance) {
     /* generic.data holds the upper 64 bits; low 8 bits are CRC carried separately */
     uint64_t d = instance->generic.data;
     instance->generic.serial = (uint32_t)((d >> 16) & 0xFFFFFFFF);
@@ -137,10 +137,10 @@ static void toyota_extract_fields(SubGhzProtocolDecoderToyota* instance) {
 
 // ─── Encoder ────────────────────────────────────────────────────────────────
 
-void* subghz_protocol_encoder_toyota_alloc(SubGhzEnvironment* environment) {
+void* subghz_protocol_encoder_toyota_lexus_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
-    SubGhzProtocolEncoderToyota* instance = malloc(sizeof(SubGhzProtocolEncoderToyota));
-    instance->base.protocol = &subghz_protocol_toyota;
+    SubGhzProtocolEncoderToyotaLexus* instance = malloc(sizeof(SubGhzProtocolEncoderToyotaLexus));
+    instance->base.protocol = &subghz_protocol_toyota_lexus;
     instance->generic.protocol_name = instance->base.protocol->name;
     instance->encoder.size_upload = 800;
     instance->encoder.upload = malloc(instance->encoder.size_upload * sizeof(LevelDuration));
@@ -149,20 +149,20 @@ void* subghz_protocol_encoder_toyota_alloc(SubGhzEnvironment* environment) {
     return instance;
 }
 
-void subghz_protocol_encoder_toyota_free(void* context) {
+void subghz_protocol_encoder_toyota_lexus_free(void* context) {
     furi_assert(context);
-    SubGhzProtocolEncoderToyota* instance = context;
+    SubGhzProtocolEncoderToyotaLexus* instance = context;
     free(instance->encoder.upload);
     free(instance);
 }
 
-void subghz_protocol_encoder_toyota_stop(void* context) {
-    SubGhzProtocolEncoderToyota* instance = context;
+void subghz_protocol_encoder_toyota_lexus_stop(void* context) {
+    SubGhzProtocolEncoderToyotaLexus* instance = context;
     instance->encoder.is_running = false;
 }
 
-LevelDuration subghz_protocol_encoder_toyota_yield(void* context) {
-    SubGhzProtocolEncoderToyota* instance = context;
+LevelDuration subghz_protocol_encoder_toyota_lexus_yield(void* context) {
+    SubGhzProtocolEncoderToyotaLexus* instance = context;
     if(instance->encoder.repeat == 0 || !instance->encoder.is_running) {
         instance->encoder.is_running = false;
         return level_duration_reset();
@@ -175,7 +175,7 @@ LevelDuration subghz_protocol_encoder_toyota_yield(void* context) {
     return ret;
 }
 
-static bool toyota_encoder_get_upload(SubGhzProtocolEncoderToyota* instance) {
+static bool toyota_encoder_get_upload(SubGhzProtocolEncoderToyotaLexus* instance) {
     furi_assert(instance);
 
     if(subghz_custom_btn_get_original() == 0) {
@@ -234,9 +234,9 @@ static bool toyota_encoder_get_upload(SubGhzProtocolEncoderToyota* instance) {
 }
 
 SubGhzProtocolStatus
-    subghz_protocol_encoder_toyota_deserialize(void* context, FlipperFormat* flipper_format) {
+    subghz_protocol_encoder_toyota_lexus_deserialize(void* context, FlipperFormat* flipper_format) {
     furi_assert(context);
-    SubGhzProtocolEncoderToyota* instance = context;
+    SubGhzProtocolEncoderToyotaLexus* instance = context;
     SubGhzProtocolStatus ret = subghz_block_generic_deserialize_check_count_bit(
         &instance->generic, flipper_format, subghz_protocol_toyota_const.min_count_bit_for_found);
     if(ret != SubGhzProtocolStatusOk) return ret;
@@ -248,29 +248,29 @@ SubGhzProtocolStatus
 
 // ─── Decoder ────────────────────────────────────────────────────────────────
 
-void* subghz_protocol_decoder_toyota_alloc(SubGhzEnvironment* environment) {
+void* subghz_protocol_decoder_toyota_lexus_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
-    SubGhzProtocolDecoderToyota* instance = malloc(sizeof(SubGhzProtocolDecoderToyota));
-    instance->base.protocol = &subghz_protocol_toyota;
+    SubGhzProtocolDecoderToyotaLexus* instance = malloc(sizeof(SubGhzProtocolDecoderToyotaLexus));
+    instance->base.protocol = &subghz_protocol_toyota_lexus;
     instance->generic.protocol_name = instance->base.protocol->name;
     return instance;
 }
 
-void subghz_protocol_decoder_toyota_free(void* context) {
+void subghz_protocol_decoder_toyota_lexus_free(void* context) {
     furi_assert(context);
     free(context);
 }
 
-void subghz_protocol_decoder_toyota_reset(void* context) {
+void subghz_protocol_decoder_toyota_lexus_reset(void* context) {
     furi_assert(context);
-    SubGhzProtocolDecoderToyota* instance = context;
+    SubGhzProtocolDecoderToyotaLexus* instance = context;
     instance->decoder.parser_step = ToyotaDecoderStepReset;
     instance->header_count = 0;
 }
 
-void subghz_protocol_decoder_toyota_feed(void* context, bool level, uint32_t duration) {
+void subghz_protocol_decoder_toyota_lexus_feed(void* context, bool level, uint32_t duration) {
     furi_assert(context);
-    SubGhzProtocolDecoderToyota* instance = context;
+    SubGhzProtocolDecoderToyotaLexus* instance = context;
 
     switch(instance->decoder.parser_step) {
     case ToyotaDecoderStepReset:
@@ -363,26 +363,26 @@ void subghz_protocol_decoder_toyota_feed(void* context, bool level, uint32_t dur
     }
 }
 
-uint8_t subghz_protocol_decoder_toyota_get_hash_data(void* context) {
+uint8_t subghz_protocol_decoder_toyota_lexus_get_hash_data(void* context) {
     furi_assert(context);
-    SubGhzProtocolDecoderToyota* instance = context;
+    SubGhzProtocolDecoderToyotaLexus* instance = context;
     return subghz_protocol_blocks_get_hash_data(
         &instance->decoder, (instance->decoder.decode_count_bit / 8) + 1);
 }
 
-SubGhzProtocolStatus subghz_protocol_decoder_toyota_serialize(
+SubGhzProtocolStatus subghz_protocol_decoder_toyota_lexus_serialize(
     void* context,
     FlipperFormat* flipper_format,
     SubGhzRadioPreset* preset) {
     furi_assert(context);
-    SubGhzProtocolDecoderToyota* instance = context;
+    SubGhzProtocolDecoderToyotaLexus* instance = context;
     return subghz_block_generic_serialize(&instance->generic, flipper_format, preset);
 }
 
 SubGhzProtocolStatus
-    subghz_protocol_decoder_toyota_deserialize(void* context, FlipperFormat* flipper_format) {
+    subghz_protocol_decoder_toyota_lexus_deserialize(void* context, FlipperFormat* flipper_format) {
     furi_assert(context);
-    SubGhzProtocolDecoderToyota* instance = context;
+    SubGhzProtocolDecoderToyotaLexus* instance = context;
     SubGhzProtocolStatus ret = subghz_block_generic_deserialize(&instance->generic, flipper_format);
     if(ret == SubGhzProtocolStatusOk) toyota_extract_fields(instance);
     return ret;
@@ -401,9 +401,9 @@ static const char* toyota_button_name(uint8_t btn) {
     }
 }
 
-void subghz_protocol_decoder_toyota_get_string(void* context, FuriString* output) {
+void subghz_protocol_decoder_toyota_lexus_get_string(void* context, FuriString* output) {
     furi_assert(context);
-    SubGhzProtocolDecoderToyota* instance = context;
+    SubGhzProtocolDecoderToyotaLexus* instance = context;
 
     furi_string_cat_printf(
         output,

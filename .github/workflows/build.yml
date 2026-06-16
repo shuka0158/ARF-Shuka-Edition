@@ -17,72 +17,31 @@ jobs:
         with:
           path: shuka-edition
 
-      - name: Clone Flipper Zero official firmware (shallow)
+      - name: Clone Flipper-ARF base firmware (shallow)
         run: |
-          git clone --depth 1 https://github.com/flipperdevices/flipperzero-firmware.git flipper-fw
+          git clone --depth 1 https://github.com/D4C1-Labs/Flipper-ARF.git flipper-fw
           cd flipper-fw
           git submodule update --init --recursive --depth 1
 
-      - name: Copy ARF-Shuka-Edition files into firmware tree
+      - name: Add toyota_lexus protocol (our unique addition)
         run: |
           REPO=flipper-fw
           SHUKA=shuka-edition
 
-          # All new protocol + crypto files (exclude files that need ARF-specific API)
-          for f in $SHUKA/new_files/*.c; do
-            fname=$(basename "$f")
-            # desktop_scene_boot_text.c goes to scenes/, not protocols/
-            [ "$fname" = "desktop_scene_boot_text.c" ] && continue
-            # scan_automotive.c uses ARF-only API not present in official firmware
-            [ "$fname" = "scan_automotive.c" ] && continue
-            cp "$f" $REPO/lib/subghz/protocols/
-          done
-          cp $SHUKA/new_files/*.h  $REPO/lib/subghz/protocols/
-          # desktop_scene_boot_text.c uses ARF-specific DesktopBootTextExit event
-          # which requires desktop_events.h + desktop_scene_config.h from ARF fork.
-          # Skipped to keep all official desktop scenes intact.
+          # toyota_lexus.c/h — covers Corolla/Camry/RAV4/Hilux/Land Cruiser/Lexus IS-RX-GS
+          # (2003-2020, 72-bit PWM + CRC-8). ARF's toyota.c covers older Verso/Tundra variants.
+          cp $SHUKA/new_files/toyota_lexus.c $REPO/lib/subghz/protocols/
+          cp $SHUKA/new_files/toyota_lexus.h $REPO/lib/subghz/protocols/
 
-          # Modified protocol files
-          cp $SHUKA/modified_files/keeloq.c          $REPO/lib/subghz/protocols/
-          cp $SHUKA/modified_files/protocol_items.c  $REPO/lib/subghz/protocols/
-          cp $SHUKA/modified_files/protocol_items.h  $REPO/lib/subghz/protocols/
+          # Patch protocol_items.h — add include after toyota.h
+          sed -i 's|#include "toyota.h"|#include "toyota.h"\n#include "toyota_lexus.h"|' \
+            $REPO/lib/subghz/protocols/protocol_items.h
 
-          # custom_btn + ARF global state (goes into blocks/)
-          cp $SHUKA/modified_files/custom_btn.c                    $REPO/lib/subghz/blocks/
-          cp $SHUKA/modified_files/custom_btn.h                    $REPO/lib/subghz/blocks/
-          cp $SHUKA/modified_files/custom_btn_i.h                  $REPO/lib/subghz/blocks/
-          cp $SHUKA/modified_files/subghz_block_generic_global.c   $REPO/lib/subghz/blocks/
-          cp $SHUKA/modified_files/subghz_block_generic_global.h   $REPO/lib/subghz/blocks/
-          cp $SHUKA/modified_files/generic.h                       $REPO/lib/subghz/blocks/
+          # Patch protocol_items.c — append toyota_lexus entry after the toyota line
+          sed -i '/subghz_protocol_toyota,$/a\    \&subghz_protocol_toyota_lexus,' \
+            $REPO/lib/subghz/protocols/protocol_items.c
 
-          # keystore_i.h + ARF-extended subghz_keystore.c (goes into lib/subghz/)
-          cp $SHUKA/modified_files/subghz_keystore_i.h  $REPO/lib/subghz/
-          cp $SHUKA/modified_files/subghz_keystore.c    $REPO/lib/subghz/
-
-          # ARF extensions to types and decoder (decoder gets _long hash, types gets new fields)
-          cp $SHUKA/modified_files/types.h     $REPO/lib/subghz/
-          cp $SHUKA/modified_files/decoder.h   $REPO/lib/subghz/blocks/
-          cp $SHUKA/modified_files/decoder.c   $REPO/lib/subghz/blocks/
-          cp $SHUKA/modified_files/keeloq.h    $REPO/lib/subghz/protocols/
-
-          # furi_hal_crypto extensions
-          cp $SHUKA/modified_files/furi_hal_crypto.c $REPO/targets/f7/furi_hal/
-          cp $SHUKA/modified_files/furi_hal_crypto.h $REPO/targets/f7/furi_hal/
-
-          # NOTE: desktop.c, desktop_events.h, desktop_scene_config.h are NOT
-          # copied because they come from the ARF fork and use renamed events
-          # incompatible with the official firmware's desktop scene files.
-          # Boot-screen car icon and dummy-mode features are skipped here.
-
-          # api_symbols.csv — bumped to v87.3 to accept all new ARF-exported symbols.
-          # Without this the SDK finalization check blocks the build.
-          cp $SHUKA/modified_files/api_symbols.csv $REPO/targets/f7/
-
-          # Remove stock kia.c — our kia_v0-v7 replace it (same exported symbols)
-          rm -f $REPO/lib/subghz/protocols/kia.c \
-                $REPO/lib/subghz/protocols/kia.h
-
-          echo "Files copied OK"
+          echo "toyota_lexus added OK"
 
       - name: Set up Python & fbt toolchain
         run: |
