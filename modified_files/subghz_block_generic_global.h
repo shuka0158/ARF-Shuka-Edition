@@ -25,6 +25,10 @@ bool subghz_block_generic_global_counter_override_get(uint32_t* cnt_p);
 void subghz_block_generic_global_counter_override_set(uint32_t cnt);
 void subghz_block_generic_global_reset(void* context);
 
+/* ARF-specific furi_hal extension: rolling counter advance multiplier.
+ * Returns 1 by default; overridden by the UI layer for configurable step. */
+uint32_t furi_hal_subghz_get_rolling_counter_mult(void);
+
 #ifdef __cplusplus
 }
 #endif

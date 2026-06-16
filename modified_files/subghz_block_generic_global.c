@@ -31,13 +31,17 @@ void subghz_block_generic_global_counter_override_set(uint32_t cnt) {
 
 void subghz_block_generic_global_reset(void* context) {
     (void)context;
-    subghz_block_generic_global.endless_tx = false;
+    subghz_block_generic_global.endless_tx        = false;
     subghz_block_generic_global.cnt_need_override = false;
     subghz_block_generic_global.btn_need_override = false;
-    subghz_block_generic_global.btn_is_available = false;
-    subghz_block_generic_global.current_btn = 0;
-    subghz_block_generic_global.btn_length_bit = 0;
-    subghz_block_generic_global.cnt_is_available = false;
-    subghz_block_generic_global.cnt_length_bit = 0;
-    subghz_block_generic_global.current_cnt = 0;
+    subghz_block_generic_global.btn_is_available  = false;
+    subghz_block_generic_global.current_btn       = 0;
+    subghz_block_generic_global.btn_length_bit    = 0;
+    subghz_block_generic_global.cnt_is_available  = false;
+    subghz_block_generic_global.cnt_length_bit    = 0;
+    subghz_block_generic_global.current_cnt       = 0;
+}
+
+__attribute__((weak)) uint32_t furi_hal_subghz_get_rolling_counter_mult(void) {
+    return 1;
 }

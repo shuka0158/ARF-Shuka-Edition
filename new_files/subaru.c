@@ -474,7 +474,7 @@ void subghz_protocol_decoder_subaru_get_string(void* context, FuriString* output
         output,
         "%s %dbit\r\n"
         "Key:%08lX%08lX\r\n"
-        "Sn:%06lX Cnt:%04X\r\n"
+        "Sn:%06lX Cnt:%04lX\r\n"
         "Btn:%X [%s]",
         instance->generic.protocol_name,
         instance->generic.data_count_bit,

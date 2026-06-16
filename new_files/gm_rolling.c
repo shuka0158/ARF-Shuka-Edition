@@ -362,7 +362,7 @@ void subghz_protocol_decoder_gm_rolling_get_string(void* context, FuriString* ou
     furi_string_cat_printf(
         output,
         "GM/Chevrolet/Buick  315MHz\r\n"
-        "Sn:%08lX  Cnt:%04X\r\n"
+        "Sn:%08lX  Cnt:%04lX\r\n"
         "Btn:%02X [%s]\r\n"
         "CHK:%02X %s  %dbit",
         instance->generic.serial,

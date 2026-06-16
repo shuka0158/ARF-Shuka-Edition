@@ -408,7 +408,7 @@ void subghz_protocol_decoder_toyota_get_string(void* context, FuriString* output
     furi_string_cat_printf(
         output,
         "Toyota/Lexus  315/433MHz\r\n"
-        "Sn:%08lX  Cnt:%04X\r\n"
+        "Sn:%08lX  Cnt:%04lX\r\n"
         "Btn:%02X [%s]\r\n"
         "CRC:%02X %s  %dbit",
         instance->generic.serial,
