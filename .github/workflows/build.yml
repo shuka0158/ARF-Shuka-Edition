@@ -52,6 +52,10 @@ jobs:
           cp $SHUKA/modified_files/subghz_block_generic_global.h   $REPO/lib/subghz/blocks/
           cp $SHUKA/modified_files/generic.h                       $REPO/lib/subghz/blocks/
 
+          # keystore_i.h + ARF-extended subghz_keystore.c (goes into lib/subghz/)
+          cp $SHUKA/modified_files/subghz_keystore_i.h  $REPO/lib/subghz/
+          cp $SHUKA/modified_files/subghz_keystore.c    $REPO/lib/subghz/
+
           # furi_hal_crypto extensions
           cp $SHUKA/modified_files/furi_hal_crypto.c $REPO/targets/f7/furi_hal/
           cp $SHUKA/modified_files/furi_hal_crypto.h $REPO/targets/f7/furi_hal/
