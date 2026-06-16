@@ -10,9 +10,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      ARF_REPO: https://github.com/flipperdevices/flipperzero-firmware.git
-      ARF_BRANCH: dev
 
     steps:
       - name: Checkout ARF-Shuka-Edition
@@ -20,74 +17,102 @@ jobs:
         with:
           path: shuka-edition
 
-      - name: Clone Flipper-ARF base firmware
+      - name: Clone Flipper Zero official firmware (shallow)
         run: |
-          git clone --depth 1 --branch $ARF_BRANCH $ARF_REPO flipper-arf
+          git clone --depth 1 https://github.com/flipperdevices/flipperzero-firmware.git flipper-fw
+          cd flipper-fw
+          git submodule update --init --recursive --depth 1
 
-      - name: Apply ARF Shuka Edition patch
+      - name: Copy ARF-Shuka-Edition files into firmware tree
         run: |
-          cd flipper-arf
-          git apply ../shuka-edition/v2_arf_base/0001-ARF-Shuka-Edition-boot-text-scene-disable-firstboot-.patch
-          echo "Patch applied OK"
+          REPO=flipper-fw
+          SHUKA=shuka-edition
 
-      - name: Copy new protocol files
-        run: |
-          # Protocol implementations
-          cp shuka-edition/new_files/*.c flipper-arf/lib/subghz/protocols/
-          cp shuka-edition/new_files/*.h flipper-arf/lib/subghz/protocols/
-          # Modified files
-          cp shuka-edition/modified_files/protocol_items.c flipper-arf/lib/subghz/protocols/
-          cp shuka-edition/modified_files/protocol_items.h flipper-arf/lib/subghz/protocols/
-          cp shuka-edition/modified_files/custom_btn.c flipper-arf/lib/subghz/protocols/
-          cp shuka-edition/modified_files/custom_btn.h flipper-arf/lib/subghz/protocols/
-          cp shuka-edition/modified_files/custom_btn_i.h flipper-arf/lib/subghz/protocols/
-          cp shuka-edition/modified_files/keeloq.c flipper-arf/lib/subghz/protocols/
-          cp shuka-edition/modified_files/furi_hal_crypto.c flipper-arf/targets/f7/furi_hal/
-          cp shuka-edition/modified_files/furi_hal_crypto.h flipper-arf/targets/f7/furi_hal/
-          cp shuka-edition/modified_files/desktop.c flipper-arf/applications/services/desktop/
-          cp shuka-edition/modified_files/desktop_events.h flipper-arf/applications/services/desktop/
-          cp shuka-edition/modified_files/desktop_scene_config.h flipper-arf/applications/services/desktop/scenes/
-          cp shuka-edition/modified_files/main_application.fam flipper-arf/applications/main/
-          cp shuka-edition/new_files/desktop_scene_boot_text.c flipper-arf/applications/services/desktop/scenes/
+          # All new protocol + crypto + scanner + boot files
+          cp $SHUKA/new_files/*.c  $REPO/lib/subghz/protocols/
+          cp $SHUKA/new_files/*.h  $REPO/lib/subghz/protocols/
+          # Desktop boot scene goes to scenes folder
+          cp $SHUKA/new_files/desktop_scene_boot_text.c \
+             $REPO/applications/services/desktop/scenes/
 
-      - name: Set up uFBT build environment
+          # Modified protocol files
+          cp $SHUKA/modified_files/keeloq.c          $REPO/lib/subghz/protocols/
+          cp $SHUKA/modified_files/protocol_items.c  $REPO/lib/subghz/protocols/
+          cp $SHUKA/modified_files/protocol_items.h  $REPO/lib/subghz/protocols/
+
+          # custom_btn (new module, goes into blocks/)
+          cp $SHUKA/modified_files/custom_btn.c   $REPO/lib/subghz/blocks/
+          cp $SHUKA/modified_files/custom_btn.h   $REPO/lib/subghz/blocks/
+          cp $SHUKA/modified_files/custom_btn_i.h $REPO/lib/subghz/blocks/
+
+          # furi_hal_crypto extensions
+          cp $SHUKA/modified_files/furi_hal_crypto.c $REPO/targets/f7/furi_hal/
+          cp $SHUKA/modified_files/furi_hal_crypto.h $REPO/targets/f7/furi_hal/
+
+          # Desktop service files
+          cp $SHUKA/modified_files/desktop.c             $REPO/applications/services/desktop/
+          cp $SHUKA/modified_files/desktop_events.h      $REPO/applications/services/desktop/views/
+          cp $SHUKA/modified_files/desktop_scene_config.h \
+             $REPO/applications/services/desktop/scenes/
+
+          # Remove stock kia.c — our kia_v0-v7 replace it (same exported symbols)
+          rm -f $REPO/lib/subghz/protocols/kia.c \
+                $REPO/lib/subghz/protocols/kia.h
+
+          echo "Files copied OK"
+
+      - name: Set up Python & fbt toolchain
         run: |
-          pip install ufbt
-          ufbt --version
+          sudo apt-get install -y python3-pip scons gcc-arm-none-eabi
+          cd flipper-fw
+          python3 -m pip install --upgrade pip
+          pip3 install pyserial protobuf heatshrink2
 
       - name: Build firmware
         run: |
-          cd flipper-arf
-          ufbt UPDATE_VERSION_STRING="ARF-Shuka-Edition-$(git -C ../shuka-edition rev-parse --short HEAD)" firmware
+          cd flipper-fw
+          ./fbt COMPACT=1 DEBUG=0 \
+            DIST_SUFFIX="arf-shuka-edition" \
+            updater_package 2>&1 | tee build.log
+          echo "Build complete"
 
       - name: Check firmware size
         run: |
-          bash shuka-edition/scripts/check_size.sh flipper-arf/build/f7-firmware/firmware.dfu
+          DFU=$(find flipper-fw/dist -name "*.dfu" 2>/dev/null | head -1)
+          if [ -n "$DFU" ]; then
+            bash shuka-edition/scripts/check_size.sh "$DFU"
+          else
+            echo "No .dfu found in dist/ — checking build output"
+            find flipper-fw -name "*.dfu" | head -5
+          fi
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p artifacts
+          find flipper-fw/dist -name "*.dfu" -o -name "*.tgz" -o -name "*.zip" 2>/dev/null \
+            | xargs -I{} cp {} artifacts/ 2>/dev/null || true
+          ls -lh artifacts/
 
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
           name: ARF-Shuka-Edition-${{ github.sha }}
-          path: |
-            flipper-arf/build/f7-firmware/firmware.dfu
-            flipper-arf/build/f7-firmware/update.tgz
+          path: artifacts/
           retention-days: 30
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            flipper-arf/build/f7-firmware/firmware.dfu
-            flipper-arf/build/f7-firmware/update.tgz
+          files: artifacts/*
           body: |
             ## ARF-Shuka-Edition ${{ github.ref_name }}
 
             Flash with qFlipper (`.dfu`) or OTA via the update bundle (`.tgz`).
 
-            > **Note:** set `UPDATE_VERSION_STRING=ARF-Shuka-Edition` when building manually
-            > so qFlipper accepts the `.dfu` without rejecting it silently.
+            **Note:** built with `DIST_SUFFIX=arf-shuka-edition` — qFlipper will
+            show "arf-shuka-edition" as the version string.
 
-            See [README](README.md) for full flashing instructions.
+            See [README](README.md) for full flashing instructions and protocol list.
           draft: false
           prerelease: false
