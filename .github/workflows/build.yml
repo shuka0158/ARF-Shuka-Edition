@@ -23,25 +23,43 @@ jobs:
           cd flipper-fw
           git submodule update --init --recursive --depth 1
 
-      - name: Add toyota_lexus protocol (our unique addition)
+      - name: Add Shuka-Edition protocols on top of ARF
         run: |
           REPO=flipper-fw
           SHUKA=shuka-edition
+          PROTO=$REPO/lib/subghz/protocols
 
-          # toyota_lexus.c/h — covers Corolla/Camry/RAV4/Hilux/Land Cruiser/Lexus IS-RX-GS
-          # (2003-2020, 72-bit PWM + CRC-8). ARF's toyota.c covers older Verso/Tundra variants.
-          cp $SHUKA/new_files/toyota_lexus.c $REPO/lib/subghz/protocols/
-          cp $SHUKA/new_files/toyota_lexus.h $REPO/lib/subghz/protocols/
+          # ── Unique protocols not in upstream ARF ──────────────────────────
+          # GM Rolling (GM/Chevrolet/Buick/Cadillac rolling-code RKE)
+          cp $SHUKA/new_files/gm_rolling.c   $PROTO/
+          cp $SHUKA/new_files/gm_rolling.h   $PROTO/
 
-          # Patch protocol_items.h — add include after toyota.h
-          sed -i 's|#include "toyota.h"|#include "toyota.h"\n#include "toyota_lexus.h"|' \
-            $REPO/lib/subghz/protocols/protocol_items.h
+          # Honda Static is excluded — at 2.8 KB it pushes us over the STM32WB C2 boundary
 
-          # Patch protocol_items.c — append toyota_lexus entry after the toyota line
-          sed -i '/subghz_protocol_toyota,$/a\    \&subghz_protocol_toyota_lexus,' \
-            $REPO/lib/subghz/protocols/protocol_items.c
+          # Nissan (Nissan/Infiniti RKE)
+          cp $SHUKA/new_files/nissan.c       $PROTO/
+          cp $SHUKA/new_files/nissan.h       $PROTO/
 
-          echo "toyota_lexus added OK"
+          # Renault/Dacia RKE
+          cp $SHUKA/new_files/renault.c      $PROTO/
+          cp $SHUKA/new_files/renault.h      $PROTO/
+
+          # toyota_lexus — modern Toyota/Lexus 2003-2020 (72-bit PWM + CRC-8)
+          # ARF's toyota.c covers older Corolla Verso/Tundra dual-variant — both coexist
+          cp $SHUKA/new_files/toyota_lexus.c $PROTO/
+          cp $SHUKA/new_files/toyota_lexus.h $PROTO/
+
+          # ── Patch protocol_items.h — add our includes after toyota.h ─────
+          sed -i \
+            's|#include "toyota.h"|#include "toyota.h"\n#include "gm_rolling.h"\n#include "nissan.h"\n#include "renault.h"\n#include "toyota_lexus.h"|' \
+            $PROTO/protocol_items.h
+
+          # ── Patch protocol_items.c — add entries after &subghz_protocol_toyota ─
+          sed -i '/subghz_protocol_toyota,$/a\    \&subghz_protocol_toyota_lexus,\n    \&subghz_protocol_gm_rolling,\n    \&subghz_protocol_nissan,\n    \&subghz_protocol_renault,' \
+            $PROTO/protocol_items.c
+
+          echo "All Shuka-Edition protocols added OK"
+          grep -c "subghz_protocol_\|_protocol," $PROTO/protocol_items.c || true
 
       - name: Set up Python & fbt toolchain
         run: |
