@@ -191,7 +191,7 @@ static bool nissan_encoder_get_upload(SubGhzProtocolEncoderNissan* instance) {
     frame[7] = nissan_crc8(frame, 7);
 
     size_t idx = 0;
-    for(int i = 0; i < NISSAN_PREAMBLE_MIN; i++) {
+    for(size_t i = 0; i < NISSAN_PREAMBLE_MIN; i++) {
         instance->encoder.upload[idx++] =
             level_duration_make(true, subghz_protocol_nissan_const.te_short);
         instance->encoder.upload[idx++] =

@@ -28,7 +28,6 @@ const SubGhzProtocol* const subghz_protocol_registry_items[] = {
     &subghz_protocol_bett,
     &subghz_protocol_doitrand,
     &subghz_protocol_phoenix_v2,
-    &subghz_protocol_honeywell, // Should be before honeywell_wdb
     &subghz_protocol_honeywell_wdb,
     &subghz_protocol_magellan,
     &subghz_protocol_intertechno_v3,
@@ -80,12 +79,6 @@ const SubGhzProtocol* const subghz_protocol_registry_items[] = {
     &subghz_protocol_revers_rb2,
     &subghz_protocol_feron,
     &subghz_protocol_roger,
-    &subghz_protocol_elplast,
-    &subghz_protocol_treadmill37,
-    &subghz_protocol_beninca_arc,
-    &subghz_protocol_jarolift,
-    &subghz_protocol_ditec_gol4,
-    &subghz_protocol_keyfinder,
     // ARF Custom edition: automotive protocols (sorted alphabetically)
     &subghz_protocol_bmw_cas4,
     &subghz_protocol_chrysler,
