@@ -28,10 +28,13 @@ jobs:
           REPO=flipper-fw
           SHUKA=shuka-edition
 
-          # All new protocol + crypto + scanner files (exclude boot scene — wrong dir)
+          # All new protocol + crypto files (exclude files that need ARF-specific API)
           for f in $SHUKA/new_files/*.c; do
             fname=$(basename "$f")
+            # desktop_scene_boot_text.c goes to scenes/, not protocols/
             [ "$fname" = "desktop_scene_boot_text.c" ] && continue
+            # scan_automotive.c uses ARF-only API not present in official firmware
+            [ "$fname" = "scan_automotive.c" ] && continue
             cp "$f" $REPO/lib/subghz/protocols/
           done
           cp $SHUKA/new_files/*.h  $REPO/lib/subghz/protocols/
