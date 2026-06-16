@@ -1268,31 +1268,28 @@ void subghz_protocol_decoder_vag_get_string(void* context, FuriString* output) {
     if(instance->decrypted) {
         furi_string_cat_printf(
             output,
-            "%s %dbit\r\n"
-            "Key1:%08lX%08lX\r\n"
-            "Key2:%04X KeyIdx:%d\r\n"
-            "Ser:%08lX Cnt:%06lX\r\n"
-            "Btn:[%s]",
+            "%s  433MHz  Key#%d\r\n"
+            "Sn:%08lX  Cnt:%06lX\r\n"
+            "Button: %s\r\n"
+            "%dbit  AUT64/TEA",
             vehicle_name,
-            instance->data_count_bit,
-            (unsigned long)(key1 >> 32),
-            (unsigned long)(key1 & 0xFFFFFFFF),
-            key2,
             instance->key_idx,
             (unsigned long)instance->serial,
             (unsigned long)instance->cnt,
-            vag_button_name(instance->btn));
+            vag_button_name(instance->btn),
+            instance->data_count_bit);
     } else {
         furi_string_cat_printf(
             output,
-            "%s %dbit\r\n"
-            "Key1:%08lX%08lX\r\n"
-            "Key2:%04X (corrupted)\r\n",
+            "%s  433MHz  [NO KEY]\r\n"
+            "K1:%08lX%08lX\r\n"
+            "K2:%04X  Decrypt failed\r\n"
+            "%dbit",
             vehicle_name,
-            instance->data_count_bit,
             (unsigned long)(key1 >> 32),
             (unsigned long)(key1 & 0xFFFFFFFF),
-            key2);
+            key2,
+            instance->data_count_bit);
     }
 }
 

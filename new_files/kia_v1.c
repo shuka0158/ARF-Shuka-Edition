@@ -473,25 +473,17 @@ void subghz_protocol_decoder_kia_v1_get_string(void* context, FuriString* output
     SubGhzProtocolDecoderKiaV1* instance = context;
 
     subghz_protocol_kia_v1_check_remote_controller(instance);
-    
-    uint32_t code_found_hi = instance->generic.data >> 32;
-    uint32_t code_found_lo = instance->generic.data & 0xFFFFFFFF;
 
     furi_string_cat_printf(
         output,
-        "%s %dbit\r\n"
-        "Key:%06lX%08lX\r\n"
-        "Sn:%08lX Cnt:%03lX\r\n"
-        "Btn:%02X:[%s]\r\n"
-        "CRC:%02X %s\r\n",
-        instance->generic.protocol_name,
-        instance->generic.data_count_bit,
-        code_found_hi,
-        code_found_lo,
+        "KIA V1  315/433MHz\r\n"
+        "Sn:%08lX  Cnt:%03lX\r\n"
+        "Button: %s\r\n"
+        "CRC:%02X %s  %dbit",
         instance->generic.serial,
         instance->generic.cnt,
-        instance->generic.btn,
         subghz_protocol_kia_v1_get_name_button(instance->generic.btn),
         instance->crc,
-        instance->crc_check ? "(OK)" : "(FAIL)");
+        instance->crc_check ? "(OK)" : "(FAIL)",
+        instance->generic.data_count_bit);
 }

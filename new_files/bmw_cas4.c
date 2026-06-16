@@ -291,15 +291,24 @@ void subghz_protocol_decoder_bmw_cas4_get_string(void* context, FuriString* outp
     furi_check(context);
     SubGhzProtocolDecoderBmwCas4* instance = context;
 
+    bool markers_ok = (instance->raw_data[0] == BMW_CAS4_BYTE0_MARKER &&
+                       instance->raw_data[6] == BMW_CAS4_BYTE6_MARKER);
+
+    /* Byte layout: [B0:marker][B1-B5:encrypted payload][B6:marker][B7:status] */
     furi_string_cat_printf(
         output,
-        "%s %dbit\r\n"
-        "Raw:%02X %02X%02X%02X%02X%02X %02X %02X\r\n",
-        instance->generic.protocol_name,
-        (int)instance->generic.data_count_bit,
+        "BMW CAS4  433MHz AM\r\n"
+        "ID:%02X%02X%02X%02X%02X  St:%02X\r\n"
+        "Markers:%02X/%02X %s\r\n"
+        "%dbit  Enc:CAS4-HW",
+        instance->raw_data[1],
+        instance->raw_data[2],
+        instance->raw_data[3],
+        instance->raw_data[4],
+        instance->raw_data[5],
+        instance->raw_data[7],
         instance->raw_data[0],
-        instance->raw_data[1], instance->raw_data[2],
-        instance->raw_data[3], instance->raw_data[4], instance->raw_data[5],
         instance->raw_data[6],
-        instance->raw_data[7]);
+        markers_ok ? "(OK)" : "(BAD)",
+        (int)instance->generic.data_count_bit);
 }

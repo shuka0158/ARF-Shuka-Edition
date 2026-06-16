@@ -1,0 +1,40 @@
+# Build outputs
+build/
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+*.o
+*.a
+*.d
+
+# DFU artifacts (keep committed ones in firmware/ and v2_arf_base/)
+/firmware/*.dfu
+/firmware/*.tgz
+
+# Toolchain cache
+.ufbt/
+
+# Python cache
+__pycache__/
+*.py[cod]
+.python_version
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary patch work
+*.orig
+*.rej

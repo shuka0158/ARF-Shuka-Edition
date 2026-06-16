@@ -672,28 +672,18 @@ static const char* ford_v0_get_button_name(uint8_t btn) {
 void subghz_protocol_decoder_ford_v0_get_string(void* context, FuriString* output) {
     furi_assert(context);
     SubGhzProtocolDecoderFordV0* instance = context;
-    
-    uint32_t code_found_hi = (uint32_t)(instance->key1 >> 32);
-    uint32_t code_found_lo = (uint32_t)(instance->key1 & 0xFFFFFFFF);
-    
+
     furi_string_cat_printf(
         output,
-        "%s %dbit\r\n"
-        "Key1:%08lX%08lX\r\n"
-        "Key2:%04X Sn:%08lX\r\n"
-        "Btn:%02X:[%s] Cnt:%06lX\r\n"
-        "CheckSum:%02X CRC:%02X %s",
-        instance->generic.protocol_name,
-        instance->generic.data_count_bit,
-        code_found_hi,
-        code_found_lo,
-        instance->key2,
+        "Ford V0  315/433MHz\r\n"
+        "Sn:%08lX  Cnt:%lu\r\n"
+        "Button: %s\r\n"
+        "CRC:%02X CHK:%02X %s  %dbit",
         instance->serial,
-        instance->button,
+        (unsigned long)instance->count,
         ford_v0_get_button_name(instance->button),
-        instance->count,
-        (instance->key2 >> 8) & 0xFF,
         instance->key2 & 0xFF,
-        instance->crc_valid ? "(OK)" : "(FAIL)"
-    );
+        (instance->key2 >> 8) & 0xFF,
+        instance->crc_valid ? "(OK)" : "(FAIL)",
+        instance->generic.data_count_bit);
 }
