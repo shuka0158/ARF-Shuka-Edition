@@ -109,13 +109,28 @@ jobs:
           python3 -m pip install --upgrade pip
           pip3 install pyserial protobuf heatshrink2
 
+      - name: Finalize SDK symbols
+        run: |
+          cd flipper-fw
+          # Our new menu_set_* functions are new public API entries. fbt refuses to
+          # build until api_symbols.csv is updated. sdk_update regenerates it in-place.
+          ./fbt sdk_update 2>&1 || true
+          echo "SDK update done"
+
       - name: Build firmware
         run: |
           cd flipper-fw
           ./fbt COMPACT=1 DEBUG=0 \
             DIST_SUFFIX="arf-shuka-edition" \
             updater_package 2>&1 | tee build.log
-          echo "Build complete"
+          # tee hides fbt exit code; check for .dfu as the success signal
+          if find dist -name "*.dfu" | grep -q .; then
+            echo "Build OK — .dfu produced"
+          else
+            echo "Build FAILED — no .dfu found" >&2
+            cat build.log | tail -40 >&2
+            exit 1
+          fi
 
       - name: Check firmware size
         run: |
