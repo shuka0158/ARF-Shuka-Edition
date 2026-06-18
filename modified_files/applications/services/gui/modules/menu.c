@@ -63,10 +63,17 @@ static void menu_draw_list(Canvas* canvas, MenuModel* model) {
         int base_y = 25 + slot * 22; // -19 to 69
         int draw_y = base_y + (int)ofs;
 
-        // Skip items that are completely off screen
+        // Skip items completely off screen
         if(draw_y + 14 < 0 || draw_y > 63) continue;
 
-        size_t idx = (size_t)((int)count * 10 + (int)model->position + slot) % count;
+        int logical = (int)model->position + slot;
+        if(model->scroll_loop) {
+            // Wrap: add count to keep positive before modulo
+            logical = ((logical % (int)count) + (int)count) % (int)count;
+        } else {
+            if(logical < 0 || logical >= (int)count) continue;
+        }
+        size_t idx = (size_t)logical;
         MenuItem* item = MenuItemArray_get(model->items, idx);
 
         canvas_set_font(canvas, slot == 0 ? FontPrimary : FontSecondary);
