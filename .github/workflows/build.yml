@@ -61,10 +61,6 @@ jobs:
           cp $SHUKA/new_files/gm_rolling.c   $PROTO/
           cp $SHUKA/new_files/gm_rolling.h   $PROTO/
 
-          # Honda Static (fixed/static codes, Honda/Acura)
-          cp $SHUKA/new_files/honda_static.c $PROTO/
-          cp $SHUKA/new_files/honda_static.h $PROTO/
-
           # Nissan (Nissan/Infiniti RKE)
           cp $SHUKA/new_files/nissan.c       $PROTO/
           cp $SHUKA/new_files/nissan.h       $PROTO/
@@ -80,11 +76,11 @@ jobs:
 
           # ── Patch protocol_items.h — add our includes after toyota.h ─────
           sed -i \
-            's|#include "toyota.h"|#include "toyota.h"\n#include "gm_rolling.h"\n#include "honda_static.h"\n#include "nissan.h"\n#include "renault.h"\n#include "toyota_lexus.h"|' \
+            's|#include "toyota.h"|#include "toyota.h"\n#include "gm_rolling.h"\n#include "nissan.h"\n#include "renault.h"\n#include "toyota_lexus.h"|' \
             $PROTO/protocol_items.h
 
           # ── Patch protocol_items.c — add entries after &subghz_protocol_toyota ─
-          sed -i '/subghz_protocol_toyota,$/a\    \&subghz_protocol_toyota_lexus,\n    \&subghz_protocol_gm_rolling,\n    \&honda_static_protocol,\n    \&subghz_protocol_nissan,\n    \&subghz_protocol_renault,' \
+          sed -i '/subghz_protocol_toyota,$/a\    \&subghz_protocol_toyota_lexus,\n    \&subghz_protocol_gm_rolling,\n    \&subghz_protocol_nissan,\n    \&subghz_protocol_renault,' \
             $PROTO/protocol_items.c
 
           echo "All Shuka-Edition protocols added OK"
