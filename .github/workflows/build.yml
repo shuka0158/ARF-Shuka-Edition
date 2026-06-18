@@ -112,11 +112,6 @@ jobs:
       - name: Build firmware
         run: |
           cd flipper-fw
-          # Pass 1: fbt detects our new menu_set_* symbols, updates api_symbols.csv,
-          # then exits with "SDK not finalized". That update is exactly what we need.
-          ./fbt COMPACT=1 DEBUG=0 DIST_SUFFIX="arf-shuka-edition" updater_package 2>&1 || true
-
-          # Pass 2: api_symbols.csv is now current — full build succeeds.
           ./fbt COMPACT=1 DEBUG=0 \
             DIST_SUFFIX="arf-shuka-edition" \
             updater_package 2>&1 | tee build.log
