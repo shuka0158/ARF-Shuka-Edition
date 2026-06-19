@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARF Shuka Edition — Web Updater</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<style>
+:root {
+  --bg:     #0e0e0e;
+  --surf:   #1c1c1c;
+  --border: #333;
+  --or:     #ff6a00;
+  --or2:    #ff9b45;
+  --text:   #e2e2e2;
+  --dim:    #777;
+  --green:  #4caf50;
+  --red:    #f44336;
+  --yellow: #ffcc00;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;
+     min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2rem 1rem}
+.wrap{max-width:620px;width:100%}
+header{text-align:center;margin-bottom:2rem}
+header h1{font-size:2rem;color:var(--or);letter-spacing:2px;text-transform:uppercase}
+header p{color:var(--dim);font-size:.85rem;margin-top:.3rem}
+.card{background:var(--surf);border:1px solid var(--border);border-radius:8px;
+      padding:1.4rem;margin-bottom:1.1rem}
+.card h2{font-size:.75rem;text-transform:uppercase;letter-spacing:2px;
+         color:var(--or);margin-bottom:.9rem}
+.badge{display:inline-block;background:var(--or);color:#000;font-weight:700;
+       padding:.2rem .8rem;border-radius:4px;font-size:1.15rem}
+.meta{color:var(--dim);font-size:.82rem;margin-top:.4rem}
+.meta span{color:var(--text-dim)}
+a{color:var(--or);text-decoration:none}
+a:hover{text-decoration:underline}
+.steps{display:flex;flex-direction:column;gap:.35rem;margin-bottom:.9rem}
+.step{display:flex;align-items:flex-start;gap:.6rem;font-size:.88rem;color:var(--dim)}
+.step .n{color:var(--or);font-weight:700;min-width:1.2rem}
+.step .s{color:var(--text)}
+btn-group{display:flex;flex-direction:column;gap:.5rem}
+button{background:var(--or);color:#000;border:none;padding:.72rem 1.2rem;
+       border-radius:5px;font-family:inherit;font-size:.95rem;font-weight:700;
+       cursor:pointer;transition:background .15s,opacity .15s;width:100%;margin-top:.4rem}
+button:hover:not(:disabled){background:var(--or2)}
+button:disabled{background:#333;color:#555;cursor:not-allowed}
+button.ghost{background:transparent;color:var(--or);border:1px solid var(--or)}
+button.ghost:hover:not(:disabled){background:rgba(255,106,0,.1)}
+.prog-wrap{height:7px;background:#111;border-radius:4px;margin-top:.8rem;display:none}
+.prog-bar{height:7px;background:var(--or);border-radius:4px;width:0%;transition:width .08s}
+.warn{color:var(--yellow);font-size:.8rem;margin-top:.6rem}
+.no-serial{color:var(--red);font-size:.85rem;padding:.4rem 0}
+.log{background:#080808;border:1px solid #222;border-radius:5px;padding:.7rem;
+     font-size:.78rem;min-height:110px;max-height:220px;overflow-y:auto;
+     color:#aaa;white-space:pre-wrap;word-break:break-all;margin-top:.1rem}
+.ok{color:var(--green)} .er{color:var(--red)} .di{color:var(--dim)} .or{color:var(--or)}
+.pill{display:inline-block;padding:.1rem .45rem;border-radius:3px;font-size:.72rem;
+      font-weight:700;margin-left:.4rem}
+.pill.pre{background:#333;color:var(--dim)}
+.pill.sta{background:var(--green);color:#000}
+footer{color:var(--dim);font-size:.75rem;text-align:center;margin-top:1.5rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>ARF·SHUKA</h1>
+  <p>Web Updater — flash directly from your browser via WebSerial</p>
+</header>
+
+<!-- Release info -->
+<div class="card">
+  <h2>Latest Release</h2>
+  <div id="relInfo"><span class="di">Fetching release info…</span></div>
+</div>
+
+<!-- Flash -->
+<div class="card">
+  <h2>Flash via Browser</h2>
+  <div id="serialStatus"></div>
+  <div class="steps">
+    <div class="step"><span class="n">1</span><span class="s">Connect Flipper Zero via USB</span></div>
+    <div class="step"><span class="n">2</span><span class="s">Unlock the Flipper (swipe left on screen)</span></div>
+    <div class="step"><span class="n">3</span><span class="s">Click <b>Connect &amp; Flash</b> — pick the Flipper port</span></div>
+    <div class="step"><span class="n">4</span><span class="s">Wait — Flipper reboots automatically and installs</span></div>
+  </div>
+  <button id="flashBtn" disabled>Connect &amp; Flash</button>
+  <div class="prog-wrap" id="progWrap"><div class="prog-bar" id="progBar"></div></div>
+  <div class="warn" id="flashStatus">⚠ Do not unplug during flashing.</div>
+</div>
+
+<!-- Manual -->
+<div class="card">
+  <h2>Manual Install (qFlipper)</h2>
+  <button class="ghost" id="dlBtn" disabled>⬇ Download .dfu</button>
+  <div class="meta" style="margin-top:.5rem">
+    qFlipper → <b>Install from file</b> → select the downloaded <code>.dfu</code>
+  </div>
+</div>
+
+<!-- Log -->
+<div class="card">
+  <h2>Log</h2>
+  <div class="log" id="log">Ready.\n</div>
+</div>
+
+<footer>
+  <a href="https://github.com/shuka0158/ARF-Shuka-Edition" target="_blank">shuka0158/ARF-Shuka-Edition</a>
+  · Built on <a href="https://github.com/D4C1-Labs/Flipper-ARF" target="_blank">D4C1-Labs/Flipper-ARF</a>
+</footer>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════════════
+const REPO = 'shuka0158/ARF-Shuka-Edition';
+const UPLOAD_DIR = '/ext/update/arf-shuka';
+const CHUNK = 512;
+
+// ═══════════════════════════════════════════════════════════════
+//  LOGGING
+// ═══════════════════════════════════════════════════════════════
+const logEl = document.getElementById('log');
+function log(msg, cls='') {
+  const line = cls ? `<span class="${cls}">${esc(msg)}</span>\n` : esc(msg)+'\n';
+  logEl.innerHTML += line;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+// ═══════════════════════════════════════════════════════════════
+//  GITHUB RELEASE
+// ═══════════════════════════════════════════════════════════════
+let latestRelease = null;
+
+async function fetchRelease() {
+  try {
+    // Try latest stable first; fall back to latest pre-release
+    let r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`);
+    if (!r.ok) throw new Error('no stable release');
+    latestRelease = await r.json();
+  } catch {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=5`);
+    const list = await r.json();
+    // prefer non-pre if available, else newest
+    latestRelease = list.find(x => !x.prerelease) || list[0];
+  }
+
+  const tgzAsset = latestRelease.assets.find(a => a.name.includes('-update-') && a.name.endsWith('.tgz'));
+  const dfuAsset = latestRelease.assets.find(a => a.name.includes('-full-') && a.name.endsWith('.dfu'))
+                || latestRelease.assets.find(a => a.name.endsWith('.dfu') && !a.name.includes('updater'));
+
+  const tag = latestRelease.tag_name;
+  const pre = latestRelease.prerelease;
+  const date = new Date(latestRelease.published_at).toLocaleDateString();
+
+  document.getElementById('relInfo').innerHTML = `
+    <div>
+      <span class="badge">${esc(tag)}</span>
+      <span class="pill ${pre?'pre':'sta'}">${pre?'pre-release':'stable'}</span>
+    </div>
+    <div class="meta" style="margin-top:.5rem">
+      Published ${date} ·
+      <a href="${latestRelease.html_url}" target="_blank">View on GitHub ↗</a>
+    </div>`;
+
+  const dlBtn = document.getElementById('dlBtn');
+  if (dfuAsset) {
+    dlBtn.disabled = false;
+    dlBtn.onclick = () => window.open(dfuAsset.browser_download_url);
+  }
+
+  latestRelease._tgzUrl = tgzAsset?.browser_download_url;
+  latestRelease._dfuName = dfuAsset?.name || 'firmware.dfu';
+
+  log(`Release: ${tag} (${pre?'pre-release':'stable'})`, 'ok');
+  if (tgzAsset) log(`OTA bundle: ${tgzAsset.name}`, 'di');
+  else log('WARNING: No OTA bundle found in this release.', 'er');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  WEBSERAL CHECK
+// ═══════════════════════════════════════════════════════════════
+function checkSerial() {
+  const el = document.getElementById('serialStatus');
+  if (!('serial' in navigator)) {
+    el.innerHTML = '<div class="no-serial">⚠ WebSerial not supported. Use Chrome or Edge 89+.</div>';
+    return false;
+  }
+  document.getElementById('flashBtn').disabled = false;
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MINIMAL PROTOBUF ENCODER
+// ═══════════════════════════════════════════════════════════════
+function varint(n) {
+  const b = []; n = n >>> 0;
+  while (n > 0x7F) { b.push((n & 0x7F) | 0x80); n >>>= 7; }
+  b.push(n); return new Uint8Array(b);
+}
+function cat(...arrs) {
+  const len = arrs.reduce((s,a)=>s+a.length,0);
+  const o = new Uint8Array(len); let off=0;
+  for (const a of arrs) { o.set(a,off); off+=a.length; }
+  return o;
+}
+function pbV(f,v)  { return cat(varint((f<<3)|0), varint(v)); }
+function pbL(f,d)  { if(typeof d==='string')d=new TextEncoder().encode(d);
+                     return cat(varint((f<<3)|2), varint(d.length), d); }
+function frame(m)  { return cat(varint(m.length), m); }
+
+// ═══════════════════════════════════════════════════════════════
+//  BYTE-LEVEL SERIAL READER
+// ═══════════════════════════════════════════════════════════════
+class ByteStream {
+  constructor(readable) { this.r=readable.getReader(); this.q=[]; }
+  async byte() {
+    while(!this.q.length) {
+      const {value,done}=await this.r.read();
+      if(done) throw new Error('Port closed');
+      for(const b of value) this.q.push(b);
+    }
+    return this.q.shift();
+  }
+  async varint() {
+    let n=0, s=0;
+    while(true) {
+      const b=await this.byte();
+      n += (b & 0x7F) * Math.pow(2,s); s+=7;
+      if(!(b&0x80)) return n;
+    }
+  }
+  async readN(n) {
+    const o=new Uint8Array(n);
+    for(let i=0;i<n;i++) o[i]=await this.byte();
+    return o;
+  }
+  async message() { return this.readN(await this.varint()); }
+  cancel() { try{this.r.cancel();}catch{} }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MINIMAL PROTOBUF DECODER  (field→bytes map, no recursion)
+// ═══════════════════════════════════════════════════════════════
+function pbDecode(buf) {
+  const fields={}, view=new DataView(buf.buffer,buf.byteOffset,buf.byteLength);
+  let i=0;
+  function rdVarint(){
+    let n=0,s=0;
+    while(true){const b=buf[i++];n+=(b&0x7F)*Math.pow(2,s);s+=7;if(!(b&0x80))return n;}
+  }
+  while(i<buf.length){
+    const tag=rdVarint(), f=tag>>>3, t=tag&7;
+    if(t===0){ fields[f]={type:'varint',val:rdVarint()}; }
+    else if(t===2){
+      const l=rdVarint(); fields[f]={type:'bytes',val:buf.slice(i,i+l)}; i+=l;
+    } else break;
+  }
+  return fields;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FLIPPER RPC SESSION
+// ═══════════════════════════════════════════════════════════════
+class FlipperRPC {
+  constructor(port) {
+    this.port = port;
+    this.writer = null;
+    this.bs = null;
+    this.cmdId = 1;
+  }
+
+  async open() {
+    await this.port.open({ baudRate: 230400 });
+    this.writer = this.port.writable.getWriter();
+    this.bs = new ByteStream(this.port.readable);
+
+    // Wake CLI
+    await this._send(new TextEncoder().encode('\r'));
+    await this._delay(350);
+
+    // Drain any echoed text
+    const drain = new Promise(res=>setTimeout(res,400));
+    await drain;
+
+    log('Starting RPC session…', 'di');
+    await this._send(new TextEncoder().encode('start_rpc_session\r'));
+    await this._delay(600);
+    log('RPC session active', 'ok');
+  }
+
+  async _send(bytes) { await this.writer.write(bytes); }
+  _delay(ms) { return new Promise(r=>setTimeout(r,ms)); }
+
+  async _rpc(msg) {
+    await this._send(frame(msg));
+    const resp = await this.bs.message();
+    const fields = pbDecode(resp);
+    const status = fields[2]?.val ?? 0;
+    if (status !== 0) throw new Error(`RPC error ${status}`);
+    return fields;
+  }
+
+  // Create directory (ignore "already exists" error 6)
+  async mkdir(path) {
+    log(`mkdir ${path}`, 'di');
+    const req = pbL(1, path);            // StorageMkdirRequest.path
+    const msg = cat(pbV(1,this.cmdId++), pbV(3,0), pbL(13, req));
+    try { await this._rpc(msg); } catch(e) {
+      if (!e.message.includes('6')) throw e; // 6 = already exists
+    }
+  }
+
+  // Upload a file in chunks
+  async writeFile(path, data, onProgress) {
+    log(`upload ${path} (${(data.length/1024).toFixed(1)} KB)`, 'di');
+    const total = data.length;
+    let sent = 0;
+    const id = this.cmdId++;
+
+    for (let off=0; off<total; off+=CHUNK) {
+      const slice = data.slice(off, off+CHUNK);
+      const isFirst = off===0;
+      const hasNext = (off+CHUNK) < total;
+
+      // File.data = field 2 (bytes)
+      const fileMsg = pbL(2, slice);
+      // StorageWriteRequest
+      let req = fileMsg;
+      if (isFirst) req = cat(pbL(1, path), fileMsg); // include path on first chunk
+
+      const msg = cat(
+        pbV(1, id),
+        pbV(3, hasNext ? 1 : 0),
+        pbL(11, req)               // field 11 = storage_write_request
+      );
+
+      await this._rpc(msg);
+      sent += slice.length;
+      onProgress(sent/total);
+    }
+  }
+
+  // Trigger OTA update — Flipper reboots into Software Updater
+  async triggerUpdate(manifestPath) {
+    log(`Triggering OTA: ${manifestPath}`, 'or');
+    // system_update_request = field 41
+    const req = pbL(1, manifestPath);   // UpdateRequest.update_manifest
+    const msg = cat(pbV(1,this.cmdId++), pbV(3,0), pbL(41, req));
+    // Flipper reboots so response may not arrive — send and don't wait long
+    try {
+      await Promise.race([this._rpc(msg), this._delay(2000)]);
+    } catch { /* Flipper rebooted — expected */ }
+  }
+
+  async close() {
+    try { this.bs.cancel(); } catch {}
+    try { await this.writer.close(); } catch {}
+    try { await this.port.close(); } catch {}
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TAR PARSER
+// ═══════════════════════════════════════════════════════════════
+function parseTar(buf) {
+  const files = {}; let off=0;
+  while (off+512 <= buf.length) {
+    const hdr = buf.slice(off, off+512);
+    if (hdr.every(b=>b===0)) break;
+    const name = new TextDecoder().decode(hdr.slice(0,100)).replace(/\0.*/,'');
+    const type = String.fromCharCode(hdr[156]);
+    const size = parseInt(new TextDecoder().decode(hdr.slice(124,136)).replace(/\0.*/,'').trim(), 8) || 0;
+    off += 512;
+    if (type!=='5' && size>0) {
+      files[name] = buf.slice(off, off+size);
+    }
+    off += Math.ceil(size/512)*512;
+  }
+  return files;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PROGRESS UI
+// ═══════════════════════════════════════════════════════════════
+function setProgress(frac, label='') {
+  const w=document.getElementById('progWrap');
+  const b=document.getElementById('progBar');
+  const s=document.getElementById('flashStatus');
+  w.style.display='block';
+  b.style.width=(frac*100)+'%';
+  if(label) s.textContent=label;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MAIN FLASH FLOW
+// ═══════════════════════════════════════════════════════════════
+async function doFlash() {
+  const btn = document.getElementById('flashBtn');
+  btn.disabled = true;
+
+  try {
+    if (!latestRelease?._tgzUrl) throw new Error('No OTA bundle in this release. Use manual .dfu install.');
+
+    // 1. Pick serial port
+    log('Requesting serial port…', 'di');
+    const port = await navigator.serial.requestPort({ filters: [
+      { usbVendorId: 0x0483 },   // STMicro (Flipper)
+    ]});
+
+    const rpc = new FlipperRPC(port);
+
+    // 2. Download OTA bundle
+    log(`Downloading ${latestRelease._tgzUrl.split('/').pop()}…`, 'di');
+    setProgress(0, 'Downloading update bundle…');
+    const resp = await fetch(latestRelease._tgzUrl);
+    if (!resp.ok) throw new Error(`Download failed: HTTP ${resp.status}`);
+    const tgzBuf = new Uint8Array(await resp.arrayBuffer());
+    log(`Downloaded ${(tgzBuf.length/1024).toFixed(0)} KB`, 'ok');
+
+    // 3. Decompress + parse tar
+    setProgress(0.1, 'Extracting…');
+    log('Decompressing…', 'di');
+    const tarBuf = pako.ungzip(tgzBuf);
+    const files = parseTar(tarBuf);
+    const names = Object.keys(files);
+    log(`Found ${names.length} files in bundle`, 'di');
+
+    // Find update.fuf and firmware.dfu (ignore directory prefix)
+    const fufKey = names.find(n=>n.endsWith('update.fuf'));
+    const dfuKey = names.find(n=>n.endsWith('firmware.dfu'));
+    if (!fufKey) throw new Error('update.fuf not found in bundle');
+    if (!dfuKey) throw new Error('firmware.dfu not found in bundle');
+    log(`update.fuf: ${(files[fufKey].length/1024).toFixed(1)} KB`, 'di');
+    log(`firmware.dfu: ${(files[dfuKey].length/1024).toFixed(0)} KB`, 'di');
+
+    // 4. Connect to Flipper
+    setProgress(0.12, 'Connecting to Flipper…');
+    log('Opening serial port…', 'di');
+    await rpc.open();
+
+    // 5. Create update directory on Flipper SD
+    setProgress(0.15, 'Preparing SD card…');
+    await rpc.mkdir(UPLOAD_DIR);
+
+    // 6. Upload update.fuf
+    setProgress(0.18, 'Uploading update manifest…');
+    await rpc.writeFile(`${UPLOAD_DIR}/update.fuf`, files[fufKey], p=>{
+      setProgress(0.18+p*0.1, `Uploading update.fuf… ${(p*100).toFixed(0)}%`);
+    });
+    log('update.fuf uploaded', 'ok');
+
+    // 7. Upload firmware.dfu
+    setProgress(0.28, 'Uploading firmware…');
+    await rpc.writeFile(`${UPLOAD_DIR}/firmware.dfu`, files[dfuKey], p=>{
+      setProgress(0.28+p*0.68, `Uploading firmware… ${(p*100).toFixed(0)}%`);
+    });
+    log('firmware.dfu uploaded', 'ok');
+
+    // 8. Trigger update
+    setProgress(0.98, 'Triggering update — Flipper is rebooting…');
+    await rpc.triggerUpdate(`${UPLOAD_DIR}/update.fuf`);
+
+    setProgress(1.0, '✓ Done! Flipper is installing the update…');
+    log('Update triggered! Flipper will reboot and install ARF-Shuka-Edition.', 'ok');
+    log('You can unplug now.', 'ok');
+
+    await rpc.close();
+
+  } catch (err) {
+    log(`ERROR: ${err.message}`, 'er');
+    document.getElementById('flashStatus').textContent = `Error: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('flashBtn').addEventListener('click', doFlash);
+
+(async () => {
+  checkSerial();
+  try { await fetchRelease(); } catch(e) {
+    document.getElementById('relInfo').innerHTML = `<span class="er">Failed to fetch release: ${esc(e.message)}</span>`;
+    log(`Release fetch error: ${e.message}`, 'er');
+  }
+})();
+</script>
+</body>
+</html>
