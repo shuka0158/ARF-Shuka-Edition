@@ -146,3 +146,5 @@ The STM32WB55 C2 (Bluetooth coprocessor) flash boundary sits around 860 KB.
 ## License
 
 GPL-3.0 — inherited from [D4C1-Labs/Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF) and [flipperdevices/flipperzero-firmware](https://github.com/flipperdevices/flipperzero-firmware).
+
+Huge thanks to D4C1-Labs for creating such interesting project ("Flipper-ARF")
