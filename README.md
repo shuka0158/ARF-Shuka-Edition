@@ -9,11 +9,13 @@ Custom Flipper Zero firmware by **shuka0158**, built on top of [D4C1-Labs/Flippe
 
 ## Screenshots
 
-| Idle — Car Key Capture | Idle — Binary Rain | Sub-GHz |
+| Boot splash | Idle animation | Icon grid menu |
 |:---:|:---:|:---:|
-| ![Car Key animation](docs/screenshots/idle_car_key.png) | ![Binary Rain animation](docs/screenshots/idle_binary_rain.png) | ![Sub-GHz menu](docs/screenshots/subghz_menu.png) |
+| ![Boot](docs/screenshots/boot.png) | ![Idle car key](docs/screenshots/idle_car_key.png) | ![Grid menu](docs/screenshots/grid_menu.png) |
 
-*All screenshots taken directly from a live Flipper via USB.*
+| 88 protocols (4 added) | VAG decoded signal | New build features |
+|:---:|:---:|:---:|
+| ![Protocols](docs/screenshots/protocols.png) | ![VAG decoded](docs/screenshots/vag_decoded.png) | ![New features](docs/screenshots/new_features.png) |
 
 ---
 
