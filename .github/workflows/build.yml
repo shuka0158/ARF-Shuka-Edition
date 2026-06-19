@@ -139,11 +139,26 @@ jobs:
             find flipper-fw -name "*.dfu" | head -5
           fi
 
+      - name: Generate SD card animations
+        run: |
+          pip3 install -q Pillow
+          python3 shuka-edition/scripts/generate_animations.py animations_out
+          cd animations_out
+          zip -r ../artifacts_anim/ARF-Shuka-animations.zip . -x "*.DS_Store"
+          echo "Animation pack built:"
+          ls -lh ../artifacts_anim/
+        env:
+          PYTHONUNBUFFERED: "1"
+        continue-on-error: true  # don't fail the whole build if Pillow is missing
+
       - name: Collect artifacts
         run: |
           mkdir -p artifacts
           find flipper-fw/dist -name "*.dfu" -o -name "*.tgz" -o -name "*.zip" 2>/dev/null \
             | xargs -I{} cp {} artifacts/ 2>/dev/null || true
+          # Include animation pack if generated
+          mkdir -p artifacts_anim
+          cp artifacts_anim/ARF-Shuka-animations.zip artifacts/ 2>/dev/null || true
           ls -lh artifacts/
 
       - name: Upload firmware artifact

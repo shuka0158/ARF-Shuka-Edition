@@ -479,8 +479,9 @@ static void menu_process_up(Menu* menu) {
                 icon_animation_start(item->icon);
 
                 if(model->scroll_anim && model->position != old_pos) {
-                    // Items slide DOWN (y increases) — offset starts negative
-                    model->anim_offset = -22;
+                    // Clamp accumulated offset so rapid presses don't overshoot
+                    int8_t new_ofs = model->anim_offset - 22;
+                    model->anim_offset = new_ofs < -22 ? -22 : new_ofs;
                     furi_timer_start(menu->anim_timer, 25);
                 }
             }
@@ -509,8 +510,8 @@ static void menu_process_down(Menu* menu) {
                 icon_animation_start(item->icon);
 
                 if(model->scroll_anim && model->position != old_pos) {
-                    // Items slide UP (y decreases) — offset starts positive
-                    model->anim_offset = 22;
+                    int8_t new_ofs = model->anim_offset + 22;
+                    model->anim_offset = new_ofs > 22 ? 22 : new_ofs;
                     furi_timer_start(menu->anim_timer, 25);
                 }
             }
