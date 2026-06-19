@@ -1,6 +1,7 @@
 # ARF-Shuka-Edition
 
 Custom Flipper Zero firmware by **shuka0158**, built on top of [D4C1-Labs/Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF).
+[This project is made only for educational purposes!]
 
 [![Build](https://github.com/shuka0158/ARF-Shuka-Edition/actions/workflows/build.yml/badge.svg)](https://github.com/shuka0158/ARF-Shuka-Edition/actions/workflows/build.yml)
 [![Auto-sync](https://github.com/shuka0158/ARF-Shuka-Edition/actions/workflows/auto-update.yml/badge.svg)](https://github.com/shuka0158/ARF-Shuka-Edition/actions/workflows/auto-update.yml)
