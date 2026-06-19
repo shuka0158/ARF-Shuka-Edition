@@ -114,6 +114,32 @@ jobs:
           python3 -m pip install --upgrade pip
           pip3 install pyserial protobuf heatshrink2
 
+      - name: Embed custom animations into firmware resources
+        run: |
+          pip3 install -q Pillow
+          EXTERN=flipper-fw/assets/dolphin/external
+
+          # Remove ARF's stock external animations — only our 4 will remain
+          rm -rf "${EXTERN:?}"/*
+
+          # Generate directly into the dolphin external path fbt expects.
+          # DolphinExtBuilder packs this folder into resources.ths → deployed to
+          # /int/dolphin/ during OTA install, so no SD card required.
+          python3 shuka-edition/scripts/generate_animations.py "$EXTERN"
+
+          echo "Custom animations embedded:"
+          ls -la "$EXTERN/"
+          echo "Manifest:"
+          cat "$EXTERN/manifest.txt"
+
+          # Also zip for the GitHub Release — users can copy to SD card too
+          mkdir -p artifacts_anim
+          cp -r "$EXTERN/" artifacts_anim/ARF-Shuka-animations
+          (cd artifacts_anim && zip -r ARF-Shuka-animations.zip ARF-Shuka-animations/ -x "*.DS_Store")
+          echo "Animation SD pack built."
+        env:
+          PYTHONUNBUFFERED: "1"
+
       - name: Build firmware
         run: |
           cd flipper-fw
@@ -138,18 +164,6 @@ jobs:
             echo "No .dfu found in dist/ — checking build output"
             find flipper-fw -name "*.dfu" | head -5
           fi
-
-      - name: Generate SD card animations
-        run: |
-          pip3 install -q Pillow
-          python3 shuka-edition/scripts/generate_animations.py animations_out
-          mkdir -p artifacts_anim
-          zip -r artifacts_anim/ARF-Shuka-animations.zip animations_out/ -x "*.DS_Store"
-          echo "Animation pack built:"
-          ls -lh artifacts_anim/
-        env:
-          PYTHONUNBUFFERED: "1"
-        continue-on-error: true
 
       - name: Collect artifacts
         run: |
