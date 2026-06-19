@@ -20,10 +20,16 @@ OLD_WAVE = (
     "            // Separator between waveform and text\n"
     "            canvas_draw_line(canvas, 0, 34, 127, 34);"
 )
+# canvas_draw_icon treats white pixels as transparent — the waveform shows through.
+# Fix: paint a white box over the left half first to erase the waveform there,
+# then draw Heisenberg in black on the clean white background.
 NEW_WAVE = (
     "            subghz_view_rssi_waveform_draw(canvas, model);\n"
     "\n"
-    "            // ARF-Shuka: Heisenberg left half (covers waveform on left)\n"
+    "            // ARF-Shuka: white box erases waveform on left half, then draw Heisenberg\n"
+    "            canvas_set_color(canvas, ColorWhite);\n"
+    "            canvas_draw_box(canvas, 0, 0, 64, 34);\n"
+    "            canvas_set_color(canvas, ColorBlack);\n"
     "            canvas_draw_icon(canvas, 0, 0, &I_Heisenberg_64x64);\n"
     "\n"
     "            // Separator — right half only\n"
@@ -32,21 +38,24 @@ NEW_WAVE = (
 
 if OLD_WAVE in src:
     src = src.replace(OLD_WAVE, NEW_WAVE, 1)
-    print("Patched: waveform + icon + separator")
+    print("Patched: waveform + white-box + Heisenberg + separator")
 else:
-    # Fallback: just append icon call after waveform draw, no separator change
+    # Fallback: inject after waveform draw without changing separator
     ANCHOR = "            subghz_view_rssi_waveform_draw(canvas, model);\n"
     idx = src.find(ANCHOR)
     if idx == -1:
         print("ERROR: could not locate subghz_view_rssi_waveform_draw in receiver.c", file=sys.stderr)
         sys.exit(1)
     INJECT = (
-        "            // ARF-Shuka: Heisenberg left half\n"
+        "            // ARF-Shuka: white box + Heisenberg on left half\n"
+        "            canvas_set_color(canvas, ColorWhite);\n"
+        "            canvas_draw_box(canvas, 0, 0, 64, 34);\n"
+        "            canvas_set_color(canvas, ColorBlack);\n"
         "            canvas_draw_icon(canvas, 0, 0, &I_Heisenberg_64x64);\n"
     )
     end = idx + len(ANCHOR)
     src = src[:end] + INJECT + src[end:]
-    print("Patched (fallback): icon injected after waveform draw")
+    print("Patched (fallback): white-box + Heisenberg injected after waveform draw")
 
 # ── 2. Shift frequency text to right half (center at x=96 instead of 64) ─────
 
