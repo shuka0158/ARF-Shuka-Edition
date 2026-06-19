@@ -1,4 +1,4 @@
-# [Don't forget to star the repo]
+# [Don't forget to star this repo]
 
 # ARF-Shuka-Edition
 
