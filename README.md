@@ -49,12 +49,7 @@ Custom branded boot splash is shown on first boot and after firmware updates.
 
 Embedded directly into the firmware update bundle — no SD card copy-paste needed. After flashing, the Flipper shows these on the idle desktop:
 
-| Animation | Description |
-|---|---|
-| **Car Key Capture** | Car emitting RKE signal bursts, padlock snaps shut |
-| **Binary Rain** | Matrix-style scrolling 0/1 columns with lit heads |
-| **RF Signal Sweep** | Radio tower with expanding signal arcs and bar meter |
-| **Signal Idle** | Pulsing equalizer bars with ARF-SHUKA pixel label |
+
 
 ### Menu appearance settings
 
