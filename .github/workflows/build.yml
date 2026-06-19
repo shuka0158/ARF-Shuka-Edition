@@ -154,47 +154,12 @@ jobs:
           pip3 install -q Pillow
           ICONS=flipper-fw/assets/icons/SubGhz
 
-          # Generate the 64×64 Heisenberg pixel-art icon
+          # Generate the 64x64 Heisenberg pixel-art icon
           python3 shuka-edition/scripts/generate_heisenberg.py "$ICONS/Heisenberg_64x64.png"
           echo "Heisenberg icon written to $ICONS/"
 
-          # Patch receiver.c: draw Heisenberg on the left half of the scanning idle screen
-          python3 - <<'PATCHER'
-import sys
-
-path = "flipper-fw/applications/main/subghz/views/receiver.c"
-with open(path, "r") as f:
-    src = f.read()
-
-OLD = "            subghz_view_rssi_waveform_draw(canvas, model);\n\n            // Separator between waveform and text\n            canvas_draw_line(canvas, 0, 34, 127, 34);"
-NEW = "            subghz_view_rssi_waveform_draw(canvas, model);\n\n            // ARF-Shuka: Heisenberg on the left half — covers waveform on that side\n            canvas_draw_icon(canvas, 0, 0, &I_Heisenberg_64x64);\n\n            // Separator — right half only (Heisenberg occupies left 64px)\n            canvas_draw_line(canvas, 64, 34, 127, 34);"
-
-if OLD not in src:
-    # Try a simpler single-line anchor if ARF changed the comment
-    OLD2 = "            subghz_view_rssi_waveform_draw(canvas, model);\n"
-    IDX = src.find(OLD2)
-    if IDX == -1:
-        print("ERROR: could not find waveform draw call in receiver.c", file=sys.stderr)
-        sys.exit(1)
-    INSERT = "            // ARF-Shuka: Heisenberg on left half\n            canvas_draw_icon(canvas, 0, 0, &I_Heisenberg_64x64);\n"
-    src = src[:IDX + len(OLD2)] + INSERT + src[IDX + len(OLD2):]
-else:
-    src = src.replace(OLD, NEW, 1)
-
-# Move frequency text and mode label to the right half
-src = src.replace(
-    "canvas_draw_str_aligned(canvas, 64, 45, AlignCenter, AlignBottom, freq_mhz);",
-    "canvas_draw_str_aligned(canvas, 96, 45, AlignCenter, AlignBottom, freq_mhz);"
-, 1)
-src = src.replace(
-    "canvas_draw_str_aligned(\n                canvas,\n                1,\n                1,\n                AlignLeft,\n                AlignTop,\n                model->hopping_enabled ? \"[Hopping]\" : \"[Fix]\");",
-    "canvas_draw_str_aligned(\n                canvas,\n                65,\n                1,\n                AlignLeft,\n                AlignTop,\n                model->hopping_enabled ? \"[Hopping]\" : \"[Fix]\");"
-, 1)
-
-with open(path, "w") as f:
-    f.write(src)
-print("receiver.c patched OK")
-PATCHER
+          # Patch receiver.c to draw Heisenberg on the left half of the scan idle screen
+          python3 shuka-edition/scripts/patch_receiver.py
         env:
           PYTHONUNBUFFERED: "1"
 
