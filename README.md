@@ -17,6 +17,10 @@ Custom Flipper Zero firmware by **shuka0158**, built on top of [D4C1-Labs/Flippe
 |:---:|:---:|:---:|
 | ![Protocols](docs/screenshots/protocols.png) | ![VAG decoded](docs/screenshots/vag_decoded.png) | ![New features](docs/screenshots/new_features.png) |
 
+| Signal Idle animation | SubGHz Read — Heisenberg |
+|:---:|:---:|
+| ![Signal idle](docs/screenshots/idle_signal_bars.png) | ![Heisenberg SubGHz](docs/screenshots/subghz_heisenberg.png) |
+
 ---
 
 ## What this adds beyond ARF
