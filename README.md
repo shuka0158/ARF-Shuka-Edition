@@ -3,6 +3,17 @@
 Custom Flipper Zero firmware by **shuka0158**, built on top of [D4C1-Labs/Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF).
 
 [![Build](https://github.com/shuka0158/ARF-Shuka-Edition/actions/workflows/build.yml/badge.svg)](https://github.com/shuka0158/ARF-Shuka-Edition/actions/workflows/build.yml)
+[![Auto-sync](https://github.com/shuka0158/ARF-Shuka-Edition/actions/workflows/auto-update.yml/badge.svg)](https://github.com/shuka0158/ARF-Shuka-Edition/actions/workflows/auto-update.yml)
+
+---
+
+## Screenshots
+
+| Idle — Car Key Capture | Idle — Binary Rain | Sub-GHz |
+|:---:|:---:|:---:|
+| ![Car Key animation](docs/screenshots/idle_car_key.png) | ![Binary Rain animation](docs/screenshots/idle_binary_rain.png) | ![Sub-GHz menu](docs/screenshots/subghz_menu.png) |
+
+*All screenshots taken directly from a live Flipper via USB.*
 
 ---
 
@@ -23,6 +34,29 @@ ARF-Shuka-Edition is identical to upstream ARF plus **4 automotive protocols** t
 Everything else — all 64 ARF protocols, the automotive scanner, car-key emulator, custom button support, Keeloq extensions, AES/AUT64/TEA crypto — is unchanged from ARF upstream.
 
 Custom branded boot splash is shown on first boot and after firmware updates.
+
+### 4 custom idle animations (no SD card required)
+
+Embedded directly into the firmware update bundle — no SD card copy-paste needed. After flashing, the Flipper shows these on the idle desktop:
+
+| Animation | Description |
+|---|---|
+| **Car Key Capture** | Car emitting RKE signal bursts, padlock snaps shut |
+| **Binary Rain** | Matrix-style scrolling 0/1 columns with lit heads |
+| **RF Signal Sweep** | Radio tower with expanding signal arcs and bar meter |
+| **Signal Idle** | Pulsing equalizer bars with ARF-SHUKA pixel label |
+
+### Menu appearance settings
+
+Go to **Settings → Desktop** to configure:
+
+- **Scroll Style** — Linear (stops at ends) or Warp (wraps around to first/last)
+- **Scroll Animation** — Instant jump or smooth slide between items
+- **Menu Layout** — Classic list or Icon Grid (4 columns × 3 rows)
+
+### Auto-sync with upstream ARF
+
+A GitHub Actions bot checks for new ARF releases every 6 hours. When a new build is detected, it automatically rebuilds ARF-Shuka-Edition on top of it and publishes a new release — tagged with the upstream ARF build it is based on.
 
 ---
 
