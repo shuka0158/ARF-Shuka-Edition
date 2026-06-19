@@ -143,13 +143,13 @@ jobs:
         run: |
           pip3 install -q Pillow
           python3 shuka-edition/scripts/generate_animations.py animations_out
-          cd animations_out
-          zip -r ../artifacts_anim/ARF-Shuka-animations.zip . -x "*.DS_Store"
+          mkdir -p artifacts_anim
+          zip -r artifacts_anim/ARF-Shuka-animations.zip animations_out/ -x "*.DS_Store"
           echo "Animation pack built:"
-          ls -lh ../artifacts_anim/
+          ls -lh artifacts_anim/
         env:
           PYTHONUNBUFFERED: "1"
-        continue-on-error: true  # don't fail the whole build if Pillow is missing
+        continue-on-error: true
 
       - name: Collect artifacts
         run: |
