@@ -21,9 +21,18 @@ jobs:
 
       - name: Clone Flipper-ARF base firmware (shallow)
         run: |
-          git clone --depth 1 https://github.com/D4C1-Labs/Flipper-ARF.git flipper-fw
+          ARF_TAG=$(cat shuka-edition/ARF_VERSION 2>/dev/null | tr -d '[:space:]')
+          if [ -n "$ARF_TAG" ]; then
+            echo "Cloning ARF tag: $ARF_TAG"
+            git clone --depth 1 --branch "$ARF_TAG" \
+              https://github.com/D4C1-Labs/Flipper-ARF.git flipper-fw
+          else
+            echo "No ARF_VERSION found — cloning latest HEAD"
+            git clone --depth 1 https://github.com/D4C1-Labs/Flipper-ARF.git flipper-fw
+          fi
           cd flipper-fw
           git submodule update --init --recursive --depth 1
+          echo "ARF_TAG=${ARF_TAG:-HEAD}" >> "$GITHUB_ENV"
 
       - name: Stamp version string
         run: |
@@ -191,6 +200,8 @@ jobs:
           files: artifacts/*
           body: |
             ## ARF-Shuka-Edition ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', github.run_number) }}
+
+            **Based on ARF:** `${{ env.ARF_TAG }}`
 
             Flash with qFlipper (`.dfu`) or OTA via the update bundle (`.tgz`).
 
