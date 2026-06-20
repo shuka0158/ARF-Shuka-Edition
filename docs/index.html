@@ -194,17 +194,12 @@ function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
 let latestRelease = null;
 
 async function fetchRelease() {
-  try {
-    // Try latest stable first; fall back to latest pre-release
-    let r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`);
-    if (!r.ok) throw new Error('no stable release');
-    latestRelease = await r.json();
-  } catch {
-    const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=5`);
-    const list = await r.json();
-    // prefer non-pre if available, else newest
-    latestRelease = list.find(x => !x.prerelease) || list[0];
-  }
+  // Always fetch the full list so pre-releases (our CI builds) are visible
+  const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=10`);
+  if (!r.ok) throw new Error('GitHub API error: ' + r.status);
+  const list = await r.json();
+  // Newest release first (pre-release or stable — our CI builds are pre-releases)
+  latestRelease = list[0];
 
   const tgzAsset = latestRelease.assets.find(a => a.name.includes('-update-') && a.name.endsWith('.tgz'));
   const dfuAsset = latestRelease.assets.find(a => a.name.includes('-full-') && a.name.endsWith('.dfu'))
