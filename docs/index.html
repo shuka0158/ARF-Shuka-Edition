@@ -407,7 +407,14 @@ class FlipperRPC {
         pbL(11, req)
       );
 
-      await this._rpc(msg);
+      if (hasNext) {
+        // Flipper only ACKs the final chunk — just send intermediate ones
+        await this._send(frame(msg));
+      } else {
+        // Final chunk: Flipper sends its one and only response
+        await this._rpc(msg);
+      }
+
       sent += slice.length;
       const pct = sent/total;
       const now = Date.now();
