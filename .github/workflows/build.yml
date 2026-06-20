@@ -212,11 +212,32 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir -p artifacts
-          find flipper-fw/dist -name "*.dfu" -o -name "*.tgz" -o -name "*.zip" 2>/dev/null \
-            | xargs -I{} cp {} artifacts/ 2>/dev/null || true
-          # Include animation pack if generated
-          mkdir -p artifacts_anim
+
+          # Show what fbt actually produced so we can debug missing files
+          echo "=== dist/ contents ==="
+          find flipper-fw/dist -type f | sort
+
+          # Copy DFU and any tgz fbt may have made
+          find flipper-fw/dist \( -name "*.dfu" -o -name "*.tgz" \) | xargs -I{} cp {} artifacts/ 2>/dev/null || true
+
+          # If no .tgz was produced, build the OTA bundle manually from the update directory.
+          # fbt creates dist/f7-D/f7-update-<suffix>/ with update.fuf + firmware.dfu inside.
+          if ! ls artifacts/*.tgz 2>/dev/null | grep -q .; then
+            echo "No .tgz from fbt — packaging OTA bundle manually"
+            UPDATE_DIR=$(find flipper-fw/dist -maxdepth 3 -type d -name "*update*" | grep -v '\.dfu' | head -1)
+            if [ -n "$UPDATE_DIR" ]; then
+              BUNDLE_NAME="flipper-z-f7-update-arf-shuka-edition.tgz"
+              tar -czf "artifacts/${BUNDLE_NAME}" -C "$(dirname "$UPDATE_DIR")" "$(basename "$UPDATE_DIR")"
+              echo "Created OTA bundle: ${BUNDLE_NAME}"
+            else
+              echo "WARNING: no update directory found in dist/ — OTA web flash will not work"
+              find flipper-fw/dist -type d | sort
+            fi
+          fi
+
+          # Include animation pack
           cp artifacts_anim/ARF-Shuka-animations.zip artifacts/ 2>/dev/null || true
+          echo "=== artifacts/ ==="
           ls -lh artifacts/
 
       - name: Upload firmware artifact
