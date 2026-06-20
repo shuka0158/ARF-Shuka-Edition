@@ -26,6 +26,16 @@ body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;
 .page header{grid-column:1/-1;text-align:center}
 .sidebar{display:flex;flex-direction:column;gap:.7rem;padding-top:.2rem}
 .wrap{min-width:0}
+@media(max-width:900px){
+  .page{grid-template-columns:1fr}
+  .sidebar{flex-direction:row;flex-wrap:wrap;justify-content:center}
+  .sidebar figure{width:calc(33% - .5rem);min-width:130px}
+}
+@media(max-width:480px){
+  .sidebar figure{width:calc(50% - .5rem)}
+  header h1{font-size:1.3rem}
+  button{font-size:.85rem;padding:.6rem 1rem}
+}
 header{text-align:center;margin-bottom:2rem}
 header h1{font-size:2rem;color:var(--or);letter-spacing:2px;text-transform:uppercase}
 header p{color:var(--dim);font-size:.85rem;margin-top:.3rem}
