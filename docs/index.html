@@ -20,8 +20,12 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;
-     min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2rem 1rem}
-.wrap{max-width:620px;width:100%}
+     min-height:100vh;padding:2rem 1rem}
+.page{display:grid;grid-template-columns:160px 1fr 160px;grid-template-rows:auto 1fr;
+      gap:1rem;max-width:980px;margin:0 auto}
+.page header{grid-column:1/-1;text-align:center}
+.sidebar{display:flex;flex-direction:column;gap:.7rem;padding-top:.2rem}
+.wrap{min-width:0}
 header{text-align:center;margin-bottom:2rem}
 header h1{font-size:2rem;color:var(--or);letter-spacing:2px;text-transform:uppercase}
 header p{color:var(--dim);font-size:.85rem;margin-top:.3rem}
@@ -63,51 +67,31 @@ footer{color:var(--dim);font-size:.75rem;text-align:center;margin-top:1.5rem}
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="page">
 
 <header>
   <h1>ARF [Custom]</h1>
   <p>Web Updater — flash directly from your browser via WebSerial</p>
 </header>
 
-<!-- Screenshots -->
-<div class="card">
-  <h2>Screenshots</h2>
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.6rem">
-    <figure style="margin:0;text-align:center">
-      <img src="screenshots/boot.png" style="width:100%;border-radius:4px;border:1px solid var(--border)" alt="Boot splash">
-      <figcaption style="font-size:.72rem;color:var(--dim);margin-top:.3rem">Boot splash</figcaption>
-    </figure>
-    <figure style="margin:0;text-align:center">
-      <img src="screenshots/idle_car_key.png" style="width:100%;border-radius:4px;border:1px solid var(--border)" alt="Idle — Car Key">
-      <figcaption style="font-size:.72rem;color:var(--dim);margin-top:.3rem">Idle — Car Key</figcaption>
-    </figure>
-    <figure style="margin:0;text-align:center">
-      <img src="screenshots/idle_signal_bars.png" style="width:100%;border-radius:4px;border:1px solid var(--border)" alt="Idle — Signal Bars">
-      <figcaption style="font-size:.72rem;color:var(--dim);margin-top:.3rem">Idle — Signal Bars</figcaption>
-    </figure>
-    <figure style="margin:0;text-align:center">
-      <img src="screenshots/grid_menu.png" style="width:100%;border-radius:4px;border:1px solid var(--border)" alt="Icon Grid Menu">
-      <figcaption style="font-size:.72rem;color:var(--dim);margin-top:.3rem">Icon Grid Menu</figcaption>
-    </figure>
-    <figure style="margin:0;text-align:center">
-      <img src="screenshots/protocols.png" style="width:100%;border-radius:4px;border:1px solid var(--border)" alt="88 Protocols">
-      <figcaption style="font-size:.72rem;color:var(--dim);margin-top:.3rem">88 Protocols</figcaption>
-    </figure>
-    <figure style="margin:0;text-align:center">
-      <img src="screenshots/vag_decoded.png" style="width:100%;border-radius:4px;border:1px solid var(--border)" alt="VAG Decoded">
-      <figcaption style="font-size:.72rem;color:var(--dim);margin-top:.3rem">VAG Decoded</figcaption>
-    </figure>
-    <figure style="margin:0;text-align:center">
-      <img src="screenshots/new_features.png" style="width:100%;border-radius:4px;border:1px solid var(--border)" alt="New Features">
-      <figcaption style="font-size:.72rem;color:var(--dim);margin-top:.3rem">New Features</figcaption>
-    </figure>
-    <figure style="margin:0;text-align:center">
-      <img src="screenshots/subghz_heisenberg.png" style="width:100%;border-radius:4px;border:1px solid var(--border)" alt="SubGHz — Heisenberg">
-      <figcaption style="font-size:.72rem;color:var(--dim);margin-top:.3rem">SubGHz — Heisenberg</figcaption>
-    </figure>
-  </div>
-</div>
+<!-- Left sidebar -->
+<aside class="sidebar">
+  <figure style="margin:0;text-align:center">
+    <img src="screenshots/boot.png" style="width:100%;border-radius:4px;border:1px solid var(--border)" alt="Boot splash">
+    <figcaption style="font-size:.68rem;color:var(--dim);margin-top:.3rem">Boot splash</figcaption>
+  </figure>
+  <figure style="margin:0;text-align:center">
+    <img src="screenshots/idle_car_key.png" style="width:100%;border-radius:4px;border:1px solid var(--border)" alt="Idle — Car Key">
+    <figcaption style="font-size:.68rem;color:var(--dim);margin-top:.3rem">Idle — Car Key</figcaption>
+  </figure>
+  <figure style="margin:0;text-align:center">
+    <img src="screenshots/idle_signal_bars.png" style="width:100%;border-radius:4px;border:1px solid var(--border)" alt="Idle — Signal">
+    <figcaption style="font-size:.68rem;color:var(--dim);margin-top:.3rem">Idle — Signal</figcaption>
+  </figure>
+</aside>
+
+<!-- Main content -->
+<div class="wrap">
 
 <!-- Release info -->
 <div class="card">
@@ -145,7 +129,7 @@ footer{color:var(--dim);font-size:.75rem;text-align:center;margin-top:1.5rem}
   <div class="log" id="log">Ready.\n</div>
 </div>
 
-<footer>
+<footer style="margin-top:.5rem">
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
     <span>
       <a href="https://github.com/shuka0158/ARF-Shuka-Edition" target="_blank">shuka0158/ARF-Shuka-Edition</a>
@@ -154,7 +138,26 @@ footer{color:var(--dim);font-size:.75rem;text-align:center;margin-top:1.5rem}
     <span>Official ARF Firmware Page: <a href="https://arf.d4c1.com/" target="_blank">arf.d4c1.com</a></span>
   </div>
 </footer>
-</div>
+
+</div><!-- end .wrap -->
+
+<!-- Right sidebar -->
+<aside class="sidebar">
+  <figure style="margin:0;text-align:center">
+    <img src="screenshots/protocols.png" style="width:100%;border-radius:4px;border:1px solid var(--border)" alt="88 Protocols">
+    <figcaption style="font-size:.68rem;color:var(--dim);margin-top:.3rem">88 Protocols</figcaption>
+  </figure>
+  <figure style="margin:0;text-align:center">
+    <img src="screenshots/vag_decoded.png" style="width:100%;border-radius:4px;border:1px solid var(--border)" alt="VAG Decoded">
+    <figcaption style="font-size:.68rem;color:var(--dim);margin-top:.3rem">VAG Decoded</figcaption>
+  </figure>
+  <figure style="margin:0;text-align:center">
+    <img src="screenshots/subghz_heisenberg.png" style="width:100%;border-radius:4px;border:1px solid var(--border)" alt="SubGHz — Heisenberg">
+    <figcaption style="font-size:.68rem;color:var(--dim);margin-top:.3rem">SubGHz — Heisenberg</figcaption>
+  </figure>
+</aside>
+
+</div><!-- end .page -->
 
 <script>
 // ═══════════════════════════════════════════════════════════════
