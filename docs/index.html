@@ -361,8 +361,14 @@ class FlipperRPC {
   }
 
   async _send(bytes) {
-    const tmo = new Promise((_,rej)=>setTimeout(()=>rej(new Error('USB write timeout — Flipper not responding')),15000));
-    await Promise.race([this.writer.write(bytes), tmo]);
+    // Write in 64-byte USB-FS packet chunks; a single large writer.write()
+    // can stall indefinitely when the Flipper NAKs mid-transfer.
+    const PKT = 64;
+    for (let i = 0; i < bytes.length; i += PKT) {
+      const sub = bytes.subarray(i, i + PKT);
+      const tmo = new Promise((_,rej)=>setTimeout(()=>rej(new Error(`USB timeout at byte ${i}/${bytes.length}`)),10000));
+      await Promise.race([this.writer.write(sub), tmo]);
+    }
   }
   _delay(ms) { return new Promise(r=>setTimeout(r,ms)); }
 
@@ -552,7 +558,9 @@ async function doFlash() {
 
   } catch (err) {
     log(`ERROR: ${err.message}`, 'er');
+    log('Reboot Flipper, then try again.', 'or');
     document.getElementById('flashStatus').textContent = `Error: ${err.message}`;
+    try { await rpc.close(); } catch {}
   } finally {
     btn.disabled = false;
   }
