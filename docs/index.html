@@ -225,12 +225,14 @@ async function fetchRelease() {
     dlBtn.onclick = () => window.open(dfuAsset.browser_download_url);
   }
 
-  latestRelease._tgzUrl = tgzAsset?.browser_download_url;
+  // Use API asset URL (not browser_download_url) — avoids github.com CORS redirect issues.
+  // Fetch with Accept: application/octet-stream to trigger binary redirect to CDN.
+  latestRelease._tgzApiUrl = tgzAsset?.url;
   latestRelease._dfuName = dfuAsset?.name || 'firmware.dfu';
 
   log(`Release: ${tag} (${pre?'pre-release':'stable'})`, 'ok');
-  if (tgzAsset) log(`OTA bundle: ${tgzAsset.name}`, 'di');
-  else log('WARNING: No OTA bundle found in this release.', 'er');
+  if (tgzAsset) log(`OTA bundle ready: ${tgzAsset.name}`, 'ok');
+  else log('WARNING: No OTA bundle found in this release. Use manual .dfu install.', 'er');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -456,7 +458,7 @@ async function doFlash() {
   btn.disabled = true;
 
   try {
-    if (!latestRelease?._tgzUrl) throw new Error('No OTA bundle in this release. Use manual .dfu install.');
+    if (!latestRelease?._tgzApiUrl) throw new Error('No OTA bundle in this release. Use manual .dfu install.');
 
     // 1. Pick serial port
     log('Requesting serial port…', 'di');
@@ -466,10 +468,12 @@ async function doFlash() {
 
     const rpc = new FlipperRPC(port);
 
-    // 2. Download OTA bundle
-    log(`Downloading ${latestRelease._tgzUrl.split('/').pop()}…`, 'di');
+    // 2. Download OTA bundle via GitHub API (avoids CORS issues on browser_download_url)
+    log('Downloading OTA bundle…', 'di');
     setProgress(0, 'Downloading update bundle…');
-    const resp = await fetch(latestRelease._tgzUrl);
+    const resp = await fetch(latestRelease._tgzApiUrl, {
+      headers: { 'Accept': 'application/octet-stream' }
+    });
     if (!resp.ok) throw new Error(`Download failed: HTTP ${resp.status}`);
     const tgzBuf = new Uint8Array(await resp.arrayBuffer());
     log(`Downloaded ${(tgzBuf.length/1024).toFixed(0)} KB`, 'ok');
