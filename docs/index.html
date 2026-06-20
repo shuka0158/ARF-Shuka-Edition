@@ -526,21 +526,19 @@ async function doFlash() {
     setProgress(0.14, 'Preparing SD card…');
     await rpc.mkdir(UPLOAD_DIR);
 
-    // 6. Upload update.fuf
-    setProgress(0.15, 'Uploading update manifest…');
-    await rpc.writeFile(`${UPLOAD_DIR}/update.fuf`, files[fufKey], p=>{
-      setProgress(0.15+p*0.03, `Uploading update.fuf… ${(p*100).toFixed(0)}%`);
-    });
-    log('update.fuf uploaded', 'ok');
-    await rpc._delay(1000); // let Flipper flush SD cache after writing update.fuf
-
-    // 7. Upload firmware.dfu
-    setProgress(0.18, 'Uploading firmware…');
-    log('Starting firmware upload…', 'di');
+    // 6. Upload firmware.dfu first — Flipper's update-watcher fires when it
+    //    sees update.fuf appear, so we must have firmware ready before that.
+    setProgress(0.15, 'Uploading firmware…');
+    log('Uploading firmware…', 'di');
     await rpc.writeFile(`${UPLOAD_DIR}/firmware.dfu`, files[dfuKey], p=>{
-      setProgress(0.18+p*0.78, `Uploading firmware… ${(p*100).toFixed(0)}%`);
+      setProgress(0.15+p*0.80, `Uploading firmware… ${(p*100).toFixed(0)}%`);
     });
     log('firmware.dfu uploaded', 'ok');
+
+    // 7. Upload update.fuf last — writing this triggers Flipper's update-watcher
+    setProgress(0.96, 'Uploading update manifest…');
+    await rpc.writeFile(`${UPLOAD_DIR}/update.fuf`, files[fufKey], p=>{});
+    log('update.fuf uploaded', 'ok');
 
     // 8. Trigger update
     setProgress(0.98, 'Triggering update — Flipper is rebooting…');
