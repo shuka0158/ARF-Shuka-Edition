@@ -357,14 +357,6 @@ class FlipperRPC {
     log('Starting RPC session…', 'di');
     await this._send(new TextEncoder().encode('start_rpc_session\r'));
     await this._delay(600);
-
-    // Discard all CLI echo bytes accumulated before RPC mode — cancel the
-    // current reader (drops its buffer) then get a fresh one.  Without this,
-    // the first bs.message() call reads stale echo bytes as a fake ACK.
-    this.bs.cancel();
-    await this._delay(50);
-    this.bs = new ByteStream(this.port.readable);
-
     log('RPC session active', 'ok');
   }
 
@@ -374,7 +366,7 @@ class FlipperRPC {
     const PKT = 64;
     for (let i = 0; i < bytes.length; i += PKT) {
       const sub = bytes.subarray(i, i + PKT);
-      const tmo = new Promise((_,rej)=>setTimeout(()=>rej(new Error(`USB timeout at byte ${i}/${bytes.length}`)),60000));
+      const tmo = new Promise((_,rej)=>setTimeout(()=>rej(new Error(`USB timeout at byte ${i}/${bytes.length}`)),120000));
       await Promise.race([this.writer.write(sub), tmo]);
     }
   }
@@ -389,20 +381,24 @@ class FlipperRPC {
     return fields;
   }
 
-  // Create directory (ignore "already exists" error 6)
+  // Create directory — fire-and-forget; we never read the response because
+  // stale CLI echo bytes in the ReadableStream corrupt any bs.message() parse.
+  // We don't need the ACK: "already exists" is fine, and write errors surface
+  // when the first writeFile chunk fails to open the file.
   async mkdir(path) {
     log(`mkdir ${path}`, 'di');
-    const req = pbL(1, path);            // StorageMkdirRequest.path
+    const req = pbL(1, path);
     const msg = cat(pbV(1,this.cmdId++), pbV(3,0), pbL(13, req));
-    try { await this._rpc(msg); } catch(e) {
-      if (!e.message.includes('6')) throw e; // 6 = already exists
-    }
+    await this._send(frame(msg));
+    await this._delay(300); // let Flipper finish the directory SD write
   }
 
-  // Upload a file in chunks.  The Flipper only ACKs the final chunk (has_next=0).
-  // Intermediate chunks are sent without waiting for a response; USB CDC flow
-  // control (Flipper NAKs when its RX ring buffer is full) naturally paces
-  // sends to the Flipper's SD write throughput.
+  // Upload a file in chunks — fully fire-and-forget.  We never read ACKs
+  // because stale CLI echo bytes in the ReadableStream corrupt bs.message()
+  // parsing.  Natural USB CDC flow control handles pacing: writer.write()
+  // blocks (Flipper NAKs) when the Flipper's RX ring buffer is full while it
+  // is doing SD card writes, then unblocks when the SD write completes and the
+  // RPC task drains the buffer.  A 120 s per-packet timeout is the safety net.
   async writeFile(path, data, onProgress) {
     const shortName = path.split('/').pop();
     const totalKB = (data.length/1024).toFixed(1);
@@ -420,19 +416,9 @@ class FlipperRPC {
       const fileMsg = pbL(2, slice);
       let req = fileMsg;
       if (isFirst) req = cat(pbL(1, path), fileMsg);
-
       const msg = cat(pbV(1, id), pbV(3, hasNext ? 1 : 0), pbL(11, req));
 
-      // Flipper does NOT send a response for intermediate chunks (has_next=1).
-      // Only the final chunk (has_next=0) gets one ACK.  Calling _rpc on every
-      // chunk was reading stale CLI echo bytes as fake ACKs, then hanging when
-      // those ran out.  Use _send for intermediate chunks; natural USB CDC flow
-      // control (NAK when ring buffer full) paces us to the SD write speed.
-      if (hasNext) {
-        await this._send(frame(msg));
-      } else {
-        await this._rpc(msg);
-      }
+      await this._send(frame(msg));
 
       sent += slice.length;
       const pct = sent/total;
@@ -445,6 +431,9 @@ class FlipperRPC {
       onProgress(pct);
     }
 
+    // Wait for Flipper to finish flushing its file buffer to SD card.
+    updateLine(`upload ${shortName} — flushing to SD…`, 'di');
+    await this._delay(5000);
     updateLine(`upload ${shortName} — done ✓`, 'ok');
   }
 
