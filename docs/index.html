@@ -175,7 +175,7 @@ footer{color:var(--dim);font-size:.75rem;text-align:center;margin-top:1.5rem}
 // ═══════════════════════════════════════════════════════════════
 const REPO = 'shuka0158/ARF-Shuka-Edition';
 const UPLOAD_DIR = '/ext/update/arf-shuka';
-const CHUNK = 4096;
+const CHUNK = 512; // one FAT sector — Flipper drains USB RX before the next chunk arrives
 
 // ═══════════════════════════════════════════════════════════════
 //  LOGGING
