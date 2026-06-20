@@ -225,14 +225,11 @@ async function fetchRelease() {
     dlBtn.onclick = () => window.open(dfuAsset.browser_download_url);
   }
 
-  // Use API asset URL (not browser_download_url) — avoids github.com CORS redirect issues.
-  // Fetch with Accept: application/octet-stream to trigger binary redirect to CDN.
-  latestRelease._tgzApiUrl = tgzAsset?.url;
+  latestRelease._tgzApiUrl = tgzAsset?.url;  // kept for reference
   latestRelease._dfuName = dfuAsset?.name || 'firmware.dfu';
 
   log(`Release: ${tag} (${pre?'pre-release':'stable'})`, 'ok');
-  if (tgzAsset) log(`OTA bundle ready: ${tgzAsset.name}`, 'ok');
-  else log('WARNING: No OTA bundle found in this release. Use manual .dfu install.', 'er');
+  log('OTA bundle: loading from docs/latest-update.tgz (same-origin)', 'ok');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -458,8 +455,6 @@ async function doFlash() {
   btn.disabled = true;
 
   try {
-    if (!latestRelease?._tgzApiUrl) throw new Error('No OTA bundle in this release. Use manual .dfu install.');
-
     // 1. Pick serial port
     log('Requesting serial port…', 'di');
     const port = await navigator.serial.requestPort({ filters: [
@@ -468,13 +463,11 @@ async function doFlash() {
 
     const rpc = new FlipperRPC(port);
 
-    // 2. Download OTA bundle via GitHub API (avoids CORS issues on browser_download_url)
+    // 2. Download OTA bundle from same origin (docs/latest-update.tgz — no CORS)
     log('Downloading OTA bundle…', 'di');
     setProgress(0, 'Downloading update bundle…');
-    const resp = await fetch(latestRelease._tgzApiUrl, {
-      headers: { 'Accept': 'application/octet-stream' }
-    });
-    if (!resp.ok) throw new Error(`Download failed: HTTP ${resp.status}`);
+    const resp = await fetch('./latest-update.tgz');
+    if (!resp.ok) throw new Error(`Download failed: HTTP ${resp.status} — bundle not yet published, use manual .dfu`);
     const tgzBuf = new Uint8Array(await resp.arrayBuffer());
     log(`Downloaded ${(tgzBuf.length/1024).toFixed(0)} KB`, 'ok');
 
