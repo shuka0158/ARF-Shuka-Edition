@@ -410,6 +410,8 @@ class FlipperRPC {
       if (hasNext) {
         // Flipper only ACKs the final chunk — just send intermediate ones
         await this._send(frame(msg));
+        // Yield to browser event loop every 32 chunks (~16KB) to keep UI responsive
+        if (((off / CHUNK) & 31) === 0) await this._delay(0);
       } else {
         // Final chunk: Flipper sends its one and only response
         await this._rpc(msg);
@@ -535,8 +537,10 @@ async function doFlash() {
     });
     log('update.fuf uploaded', 'ok');
 
-    // 7. Upload firmware.dfu
+    // 7. Upload firmware.dfu — give Flipper 400ms to finish processing previous file
+    await new Promise(r => setTimeout(r, 400));
     setProgress(0.18, 'Uploading firmware…');
+    log('Starting firmware upload…', 'di');
     await rpc.writeFile(`${UPLOAD_DIR}/firmware.dfu`, files[dfuKey], p=>{
       setProgress(0.18+p*0.78, `Uploading firmware… ${(p*100).toFixed(0)}%`);
     });
