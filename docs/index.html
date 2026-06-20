@@ -186,6 +186,22 @@ function log(msg, cls='') {
   logEl.innerHTML += line;
   logEl.scrollTop = logEl.scrollHeight;
 }
+// Create a log line that can be updated in-place. Returns an update function.
+function logLive(msg, cls='') {
+  const id = 'live_' + Math.random().toString(36).slice(2);
+  const line = cls
+    ? `<span id="${id}" class="${cls}">${esc(msg)}</span>\n`
+    : `<span id="${id}">${esc(msg)}</span>\n`;
+  logEl.innerHTML += line;
+  logEl.scrollTop = logEl.scrollHeight;
+  return (newMsg, newCls) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (newCls) el.className = newCls;
+    el.textContent = newMsg;
+    logEl.scrollTop = logEl.scrollHeight;
+  };
+}
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
 
 // ═══════════════════════════════════════════════════════════════
@@ -368,9 +384,12 @@ class FlipperRPC {
 
   // Upload a file in chunks
   async writeFile(path, data, onProgress) {
-    log(`upload ${path} (${(data.length/1024).toFixed(1)} KB)`, 'di');
+    const shortName = path.split('/').pop();
+    const totalKB = (data.length/1024).toFixed(1);
+    const updateLine = logLive(`upload ${shortName} (0 / ${totalKB} KB — 0%)`, 'di');
     const total = data.length;
     let sent = 0;
+    let lastTick = 0;
     const id = this.cmdId++;
 
     for (let off=0; off<total; off+=CHUNK) {
@@ -378,22 +397,28 @@ class FlipperRPC {
       const isFirst = off===0;
       const hasNext = (off+CHUNK) < total;
 
-      // File.data = field 2 (bytes)
       const fileMsg = pbL(2, slice);
-      // StorageWriteRequest
       let req = fileMsg;
-      if (isFirst) req = cat(pbL(1, path), fileMsg); // include path on first chunk
+      if (isFirst) req = cat(pbL(1, path), fileMsg);
 
       const msg = cat(
         pbV(1, id),
         pbV(3, hasNext ? 1 : 0),
-        pbL(11, req)               // field 11 = storage_write_request
+        pbL(11, req)
       );
 
       await this._rpc(msg);
       sent += slice.length;
-      onProgress(sent/total);
+      const pct = sent/total;
+      const now = Date.now();
+      if (now - lastTick >= 1000 || !hasNext) {
+        lastTick = now;
+        const sentKB = (sent/1024).toFixed(1);
+        updateLine(`upload ${shortName} (${sentKB} / ${totalKB} KB — ${(pct*100).toFixed(0)}%)`, 'di');
+      }
+      onProgress(pct);
     }
+    updateLine(`upload ${shortName} — done ✓`, 'ok');
   }
 
   // Trigger OTA update — Flipper reboots into Software Updater
