@@ -360,7 +360,10 @@ class FlipperRPC {
     log('RPC session active', 'ok');
   }
 
-  async _send(bytes) { await this.writer.write(bytes); }
+  async _send(bytes) {
+    const tmo = new Promise((_,rej)=>setTimeout(()=>rej(new Error('USB write timeout — Flipper not responding')),15000));
+    await Promise.race([this.writer.write(bytes), tmo]);
+  }
   _delay(ms) { return new Promise(r=>setTimeout(r,ms)); }
 
   async _rpc(msg) {
@@ -382,17 +385,36 @@ class FlipperRPC {
     }
   }
 
-  // Upload a file in chunks
+  // Upload a file in chunks.
+  // The Flipper ACKs EVERY chunk via protobuf response. We must read them
+  // concurrently; if we don't, the Flipper's USB TX buffer fills up, flow
+  // control kicks in, and writer.write() blocks forever.
   async writeFile(path, data, onProgress) {
     const shortName = path.split('/').pop();
     const totalKB = (data.length/1024).toFixed(1);
     const updateLine = logLive(`upload ${shortName} (0 / ${totalKB} KB — 0%)`, 'di');
     const total = data.length;
+    const numChunks = Math.ceil(total / CHUNK);
     let sent = 0;
     let lastTick = 0;
     const id = this.cmdId++;
 
-    for (let off=0; off<total; off+=CHUNK) {
+    // Concurrent drainer — reads all numChunks responses as they arrive
+    let drainErr = null;
+    const drainDone = (async () => {
+      try {
+        for (let i = 0; i < numChunks; i++) {
+          const resp = await this.bs.message();
+          const f = pbDecode(resp);
+          const status = f[2]?.val ?? 0;
+          if (status !== 0) throw new Error(`RPC error ${status} at chunk ${i}`);
+        }
+      } catch(e) { drainErr = e; }
+    })();
+
+    for (let off = 0; off < total; off += CHUNK) {
+      if (drainErr) throw drainErr;
+
       const slice = data.slice(off, off+CHUNK);
       const isFirst = off===0;
       const hasNext = (off+CHUNK) < total;
@@ -401,21 +423,8 @@ class FlipperRPC {
       let req = fileMsg;
       if (isFirst) req = cat(pbL(1, path), fileMsg);
 
-      const msg = cat(
-        pbV(1, id),
-        pbV(3, hasNext ? 1 : 0),
-        pbL(11, req)
-      );
-
-      if (hasNext) {
-        // Flipper only ACKs the final chunk — just send intermediate ones
-        await this._send(frame(msg));
-        // Yield to browser event loop every 32 chunks (~16KB) to keep UI responsive
-        if (((off / CHUNK) & 31) === 0) await this._delay(0);
-      } else {
-        // Final chunk: Flipper sends its one and only response
-        await this._rpc(msg);
-      }
+      const msg = cat(pbV(1, id), pbV(3, hasNext ? 1 : 0), pbL(11, req));
+      await this._send(frame(msg));
 
       sent += slice.length;
       const pct = sent/total;
@@ -427,6 +436,10 @@ class FlipperRPC {
       }
       onProgress(pct);
     }
+
+    await drainDone;
+    if (drainErr) throw drainErr;
+
     updateLine(`upload ${shortName} — done ✓`, 'ok');
   }
 
@@ -537,8 +550,7 @@ async function doFlash() {
     });
     log('update.fuf uploaded', 'ok');
 
-    // 7. Upload firmware.dfu — give Flipper 400ms to finish processing previous file
-    await new Promise(r => setTimeout(r, 400));
+    // 7. Upload firmware.dfu
     setProgress(0.18, 'Uploading firmware…');
     log('Starting firmware upload…', 'di');
     await rpc.writeFile(`${UPLOAD_DIR}/firmware.dfu`, files[dfuKey], p=>{
