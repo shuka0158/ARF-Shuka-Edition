@@ -482,12 +482,10 @@ async function doFlash() {
     // Find update.fuf and firmware.dfu (ignore directory prefix)
     const fufKey  = names.find(n=>n.endsWith('update.fuf'));
     const dfuKey  = names.find(n=>n.endsWith('firmware.dfu'));
-    const thsKey  = names.find(n=>n.endsWith('resources.ths'));
     if (!fufKey) throw new Error('update.fuf not found in bundle');
     if (!dfuKey) throw new Error('firmware.dfu not found in bundle');
-    log(`update.fuf:    ${(files[fufKey].length/1024).toFixed(1)} KB`, 'di');
-    log(`firmware.dfu:  ${(files[dfuKey].length/1024).toFixed(0)} KB`, 'di');
-    if (thsKey) log(`resources.ths: ${(files[thsKey].length/1024).toFixed(0)} KB`, 'di');
+    log(`update.fuf:   ${(files[fufKey].length/1024).toFixed(1)} KB`, 'di');
+    log(`firmware.dfu: ${(files[dfuKey].length/1024).toFixed(0)} KB`, 'di');
 
     // 4. Connect to Flipper
     setProgress(0.12, 'Connecting to Flipper…');
@@ -507,22 +505,12 @@ async function doFlash() {
 
     // 7. Upload firmware.dfu
     setProgress(0.18, 'Uploading firmware…');
-    const thsShare = thsKey ? 0.5 : 0.78;
     await rpc.writeFile(`${UPLOAD_DIR}/firmware.dfu`, files[dfuKey], p=>{
-      setProgress(0.18+p*thsShare, `Uploading firmware… ${(p*100).toFixed(0)}%`);
+      setProgress(0.18+p*0.78, `Uploading firmware… ${(p*100).toFixed(0)}%`);
     });
     log('firmware.dfu uploaded', 'ok');
 
-    // 8. Upload resources.ths (custom animations → /int/dolphin/)
-    if (thsKey) {
-      setProgress(0.68, 'Uploading resources (animations)…');
-      await rpc.writeFile(`${UPLOAD_DIR}/resources.ths`, files[thsKey], p=>{
-        setProgress(0.68+p*0.28, `Uploading resources… ${(p*100).toFixed(0)}%`);
-      });
-      log('resources.ths uploaded', 'ok');
-    }
-
-    // 9. Trigger update
+    // 8. Trigger update
     setProgress(0.98, 'Triggering update — Flipper is rebooting…');
     await rpc.triggerUpdate(`${UPLOAD_DIR}/update.fuf`);
 

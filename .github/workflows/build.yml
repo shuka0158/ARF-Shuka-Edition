@@ -227,16 +227,17 @@ jobs:
             ls -la "$UPDATE_DIR/"
 
             # Generate the manifest the Flipper Software Updater needs.
-            # Omitting radio section — app firmware + resources only; radio stays unchanged.
-            RESOURCES=""
-            [ -f "$UPDATE_DIR/resources.ths" ] && RESOURCES=$'\nresources=resources.ths'
-            printf '[update]\ninfo=ARF-Shuka-Edition\ntarget=7\nmanifest_version=2\nfirmware=firmware.dfu%s\n' "$RESOURCES" \
+            # Firmware only — no radio (stays unchanged), no resources (12MB+, too slow for WebSerial).
+            printf '[update]\ninfo=ARF-Shuka-Edition\ntarget=7\nmanifest_version=2\nfirmware=firmware.dfu\n' \
               > "$UPDATE_DIR/update.fuf"
             echo "Generated update.fuf:"
             cat "$UPDATE_DIR/update.fuf"
 
             BUNDLE_NAME="flipper-z-f7-update-arf-shuka-edition.tgz"
-            tar -czf "artifacts/${BUNDLE_NAME}" -C "$(dirname "$UPDATE_DIR")" "$(basename "$UPDATE_DIR")"
+            # Exclude resources.ths (12MB+) — firmware.dfu + update.fuf is enough for web flash
+            tar -czf "artifacts/${BUNDLE_NAME}" \
+              --exclude='*/resources.ths' --exclude='*/radio.bin' --exclude='*/updater.bin' \
+              -C "$(dirname "$UPDATE_DIR")" "$(basename "$UPDATE_DIR")"
             echo "Created OTA bundle: ${BUNDLE_NAME} ($(du -sh artifacts/${BUNDLE_NAME} | cut -f1))"
           else
             echo "WARNING: no update directory found in dist/ — OTA web flash will not work"
