@@ -13,6 +13,9 @@
 #define MENU_SCROLL_ANIM_DEFAULT 0 // instant
 #define MENU_LAYOUT_DEFAULT      0 // list
 
+// Passport character: 0=dolphin, 1=skull, 2=hacker, 3=robot
+#define PASSPORT_CHAR_DEFAULT 0
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -40,6 +43,7 @@ typedef struct {
     uint8_t menu_scroll_loop; // 0=linear (stop at ends), 1=warp (wrap around)
     uint8_t menu_scroll_anim; // 0=instant, 1=slide
     uint8_t menu_layout;      // 0=list, 1=grid
+    uint8_t passport_char;    // 0=dolphin, 1=skull, 2=hacker, 3=robot
 } DesktopSettings;
 
 void desktop_settings_load(DesktopSettings* settings);
