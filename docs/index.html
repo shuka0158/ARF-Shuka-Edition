@@ -175,7 +175,7 @@ footer{color:var(--dim);font-size:.75rem;text-align:center;margin-top:1.5rem}
 // ═══════════════════════════════════════════════════════════════
 const REPO = 'shuka0158/ARF-Shuka-Edition';
 const UPLOAD_DIR = '/ext/update/arf-shuka';
-const CHUNK = 512;
+const CHUNK = 4096;
 
 // ═══════════════════════════════════════════════════════════════
 //  LOGGING
@@ -385,36 +385,20 @@ class FlipperRPC {
     }
   }
 
-  // Upload a file in chunks.
-  // The Flipper ACKs EVERY chunk via protobuf response. We must read them
-  // concurrently; if we don't, the Flipper's USB TX buffer fills up, flow
-  // control kicks in, and writer.write() blocks forever.
+  // Upload a file in chunks, awaiting the Flipper's ACK for every chunk.
+  // Sequential round-trip is required: Flipper ACKs each chunk, and if we
+  // outpace the reads, Flipper's USB TX buffer fills → USB CDC flow control →
+  // writer.write() blocks forever.  4 KB chunks keep round-trips to ~210.
   async writeFile(path, data, onProgress) {
     const shortName = path.split('/').pop();
     const totalKB = (data.length/1024).toFixed(1);
     const updateLine = logLive(`upload ${shortName} (0 / ${totalKB} KB — 0%)`, 'di');
     const total = data.length;
-    const numChunks = Math.ceil(total / CHUNK);
     let sent = 0;
     let lastTick = 0;
     const id = this.cmdId++;
 
-    // Concurrent drainer — reads all numChunks responses as they arrive
-    let drainErr = null;
-    const drainDone = (async () => {
-      try {
-        for (let i = 0; i < numChunks; i++) {
-          const resp = await this.bs.message();
-          const f = pbDecode(resp);
-          const status = f[2]?.val ?? 0;
-          if (status !== 0) throw new Error(`RPC error ${status} at chunk ${i}`);
-        }
-      } catch(e) { drainErr = e; }
-    })();
-
     for (let off = 0; off < total; off += CHUNK) {
-      if (drainErr) throw drainErr;
-
       const slice = data.slice(off, off+CHUNK);
       const isFirst = off===0;
       const hasNext = (off+CHUNK) < total;
@@ -424,7 +408,9 @@ class FlipperRPC {
       if (isFirst) req = cat(pbL(1, path), fileMsg);
 
       const msg = cat(pbV(1, id), pbV(3, hasNext ? 1 : 0), pbL(11, req));
-      await this._send(frame(msg));
+
+      // _rpc: send chunk + await Flipper ACK before proceeding
+      await this._rpc(msg);
 
       sent += slice.length;
       const pct = sent/total;
@@ -436,9 +422,6 @@ class FlipperRPC {
       }
       onProgress(pct);
     }
-
-    await drainDone;
-    if (drainErr) throw drainErr;
 
     updateLine(`upload ${shortName} — done ✓`, 'ok');
   }
@@ -549,6 +532,7 @@ async function doFlash() {
       setProgress(0.15+p*0.03, `Uploading update.fuf… ${(p*100).toFixed(0)}%`);
     });
     log('update.fuf uploaded', 'ok');
+    await rpc._delay(1000); // let Flipper flush SD cache after writing update.fuf
 
     // 7. Upload firmware.dfu
     setProgress(0.18, 'Uploading firmware…');
