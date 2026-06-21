@@ -91,13 +91,25 @@ jobs:
           cp $SHUKA/new_files/toyota_lexus.c $PROTO/
           cp $SHUKA/new_files/toyota_lexus.h $PROTO/
 
+          # Honda/Acura rolling-code RKE (2007+, 315/433 MHz, CRC-8 poly 0x2F)
+          cp $SHUKA/new_files/honda_acura.c  $PROTO/
+          cp $SHUKA/new_files/honda_acura.h  $PROTO/
+
+          # Volvo RKE (S40/V70/XC90 2001-2017, 433 MHz, XOR checksum)
+          cp $SHUKA/new_files/volvo.c        $PROTO/
+          cp $SHUKA/new_files/volvo.h        $PROTO/
+
+          # Hyundai New RKE (2017+ Hyundai/Genesis, 433 MHz, CRC-8 poly 0x31)
+          cp $SHUKA/new_files/hyundai_new.c  $PROTO/
+          cp $SHUKA/new_files/hyundai_new.h  $PROTO/
+
           # ── Patch protocol_items.h — add our includes after toyota.h ─────
           if ! grep -q '#include "toyota.h"' $PROTO/protocol_items.h; then
             echo "ERROR: toyota.h include not found in protocol_items.h — ARF changed its layout" >&2
             exit 1
           fi
           sed -i \
-            's|#include "toyota.h"|#include "toyota.h"\n#include "gm_rolling.h"\n#include "nissan.h"\n#include "renault.h"\n#include "toyota_lexus.h"|' \
+            's|#include "toyota.h"|#include "toyota.h"\n#include "gm_rolling.h"\n#include "nissan.h"\n#include "renault.h"\n#include "toyota_lexus.h"\n#include "honda_acura.h"\n#include "volvo.h"\n#include "hyundai_new.h"|' \
             $PROTO/protocol_items.h
           grep -q '#include "gm_rolling.h"' $PROTO/protocol_items.h || { echo "ERROR: header patch failed" >&2; exit 1; }
 
@@ -106,7 +118,7 @@ jobs:
             echo "ERROR: subghz_protocol_toyota entry not found in protocol_items.c — ARF changed its layout" >&2
             exit 1
           fi
-          sed -i '/subghz_protocol_toyota,$/a\    \&subghz_protocol_toyota_lexus,\n    \&subghz_protocol_gm_rolling,\n    \&subghz_protocol_nissan,\n    \&subghz_protocol_renault,' \
+          sed -i '/subghz_protocol_toyota,$/a\    \&subghz_protocol_toyota_lexus,\n    \&subghz_protocol_gm_rolling,\n    \&subghz_protocol_nissan,\n    \&subghz_protocol_renault,\n    \&subghz_protocol_honda_acura,\n    \&subghz_protocol_volvo,\n    \&subghz_protocol_hyundai_new,' \
             $PROTO/protocol_items.c
           grep -q 'subghz_protocol_gm_rolling' $PROTO/protocol_items.c || { echo "ERROR: protocol_items.c patch failed" >&2; exit 1; }
 
@@ -123,6 +135,10 @@ jobs:
           cp $SHUKA/new_files/assets/slideshow/first_start/frame_*.png \
              $REPO/assets/slideshow/first_start/
           echo "Boot splash applied"
+
+      - name: Preset Dolphin XP to max level
+        run: |
+          python3 shuka-edition/scripts/patch_dolphin_level.py
 
       - name: Set up Python & fbt toolchain
         run: |
@@ -162,9 +178,9 @@ jobs:
           pip3 install -q Pillow
           ICONS=flipper-fw/assets/icons/SubGhz
 
-          # Generate the 64x64 Heisenberg pixel-art icon
-          python3 shuka-edition/scripts/generate_heisenberg.py "$ICONS/Heisenberg_64x64.png"
-          echo "Heisenberg icon written to $ICONS/"
+          # Generate band-specific icons: Heisenberg (433), key fob (315), tower (868)
+          python3 shuka-edition/scripts/generate_heisenberg.py "$ICONS"
+          echo "Band art icons written to $ICONS/"
 
           # Patch receiver.c to draw Heisenberg on the left half of the scan idle screen
           python3 shuka-edition/scripts/patch_receiver.py
