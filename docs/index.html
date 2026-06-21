@@ -494,6 +494,7 @@ function setProgress(frac, label='') {
 async function doFlash() {
   const btn = document.getElementById('flashBtn');
   btn.disabled = true;
+  let rpc = null; // must be outside try so catch can close it
 
   try {
     // 1. Pick serial port
@@ -502,7 +503,7 @@ async function doFlash() {
       { usbVendorId: 0x0483 },   // STMicro (Flipper)
     ]});
 
-    const rpc = new FlipperRPC(port);
+    rpc = new FlipperRPC(port);
 
     // 2. Download OTA bundle from same origin (docs/latest-update.tgz — no CORS)
     log('Downloading OTA bundle…', 'di');
@@ -565,7 +566,7 @@ async function doFlash() {
     log(`ERROR: ${err.message}`, 'er');
     log('Reboot Flipper, then try again.', 'or');
     document.getElementById('flashStatus').textContent = `Error: ${err.message}`;
-    try { await rpc.close(); } catch {}
+    try { if (rpc) await rpc.close(); } catch {}
   } finally {
     btn.disabled = false;
   }
