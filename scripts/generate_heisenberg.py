@@ -156,10 +156,10 @@ def make_keyfob():
 
     # Key blade at bottom
     blk(d, 30, 55, 34, 62)
-    # Key teeth
-    blk(d, 30, 57, 28, 58)
-    blk(d, 30, 59, 27, 60)
-    blk(d, 30, 61, 29, 62)
+    # Key teeth (extending left from blade)
+    blk(d, 26, 57, 30, 58)
+    blk(d, 25, 59, 30, 60)
+    blk(d, 27, 61, 30, 62)
     # Key bow (ring)
     oval(d, 27, 51, 37, 57)
     wht(d, 29, 53, 35, 56)
