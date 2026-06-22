@@ -69,7 +69,7 @@ A GitHub Actions bot checks for new ARF releases every 6 hours. When a new build
 
 ---
 
-## Full protocol list (70 total)
+## Full protocol list (67 total)
 
 ### Automotive RKE (our 6 additions marked ★)
 
@@ -93,7 +93,6 @@ A GitHub Actions bot checks for new ARF releases every 6 hours. When a new build
 | Suzuki | Suzuki |
 | Toyota / Lexus | Toyota (Verso/Tundra), ★ Toyota/Lexus 2003–2020 |
 | VAG / VW / Audi / Seat / Skoda | VAG Group |
-| Russian aftermarket | Scher-Khan, Sheriff CFM, Star Line |
 
 ### Gates, barriers, garage doors (from ARF)
 

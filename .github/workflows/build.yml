@@ -67,6 +67,20 @@ jobs:
           done
           echo "Modified files applied"
 
+      - name: Strip low-coverage ARF protocols to recover flash space
+        run: |
+          PROTO=flipper-fw/lib/subghz/protocols
+
+          # Remove Russian aftermarket protocols — regional, rarely encountered outside RU.
+          # Scher-Khan (37 KB src), Sheriff CFM (23 KB src), Star Line (42 KB src)
+          # together account for ~4–6 KB of compiled flash.
+          for proto in scher_khan sheriff_cfm star_line; do
+            rm -f $PROTO/${proto}.c $PROTO/${proto}.h
+            sed -i "/#include \"${proto}.h\"/d"          $PROTO/protocol_items.h
+            sed -i "/subghz_protocol_${proto},/d"        $PROTO/protocol_items.c
+            echo "Stripped: $proto"
+          done
+
       - name: Add Shuka-Edition protocols on top of ARF
         run: |
           REPO=flipper-fw
