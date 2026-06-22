@@ -112,6 +112,25 @@ RAW · BIN RAW
 
 ---
 
+## Recovery (Flipper not responding / bricked)
+
+If your Flipper won't boot, isn't detected by qFlipper or `dfu-util`, and normal button combos don't work, use this sequence to force the STM32 hardware boot ROM into recovery mode — **no tools or case opening required**.
+
+**Exact sequence:**
+
+1. **Unplug** USB completely
+2. **Hold BACK for 30 seconds** — forces a hardware-level reset
+3. **Hold BACK + LEFT for 3 seconds** — triggers a soft reboot
+4. **Hold BACK + OK for 35 seconds** — keep holding both for the full 35 s
+5. At 35 s, **release BACK** but **keep holding OK**
+6. While still holding OK, **plug in USB**
+7. Wait a few seconds, then open **qFlipper**
+8. Flipper appears in **Recovery Mode** — hit **Repair Firmware**
+
+> This forces the STM32 into bootloader recovery via the hardware boot ROM, bypassing any broken firmware or bootloader code entirely.
+
+---
+
 ## Build from source
 
 ```bash
