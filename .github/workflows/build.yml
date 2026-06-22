@@ -174,18 +174,6 @@ jobs:
           PYTHONUNBUFFERED: "1"
 
 
-      - name: Generate and embed custom passport characters
-        run: |
-          pip3 install -q Pillow
-          PASSPORT=flipper-fw/assets/icons/Passport
-
-          # Generate skull, hacker, robot character PNGs (9 images × 3 chars = 27 files)
-          python3 shuka-edition/scripts/generate_passport_chars.py "$PASSPORT"
-          echo "Generated passport chars:"
-          ls -1 "$PASSPORT"/skull_*.png "$PASSPORT"/hacker_*.png "$PASSPORT"/robot_*.png 2>/dev/null
-
-          # Patch about.c to support runtime character selection via DesktopSettings
-          python3 shuka-edition/scripts/patch_passport.py
 
       - name: Build firmware
         run: |
