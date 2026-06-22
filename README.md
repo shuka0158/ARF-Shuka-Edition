@@ -21,25 +21,29 @@ Custom Flipper Zero firmware by **shuka0158**, built on top of [D4C1-Labs/Flippe
 |:---:|:---:|:---:|
 | ![Protocols](docs/screenshots/protocols.png) | ![VAG decoded](docs/screenshots/vag_decoded.png) | ![New features](docs/screenshots/new_features.png) |
 
-| Signal Idle animation | SubGHz Read — Heisenberg |
-|:---:|:---:|
-| ![Signal idle](docs/screenshots/idle_signal_bars.png) | ![Heisenberg SubGHz](docs/screenshots/subghz_heisenberg.png) |
+| Signal Idle animation |
+|:---:|
+| ![Signal idle](docs/screenshots/idle_signal_bars.png) |
 
 ---
 
 ## What this adds beyond ARF
 
-ARF-Shuka-Edition is identical to upstream ARF plus **4 automotive protocols** that ARF does not have:
+ARF-Shuka-Edition is identical to upstream ARF plus **6 automotive protocols** that ARF does not have:
 
 | Protocol | Brand coverage | Encoding | Frame |
 |---|---|---|---|
 | **GM Rolling** | Chevrolet, GMC, Buick, Cadillac (2000–2015) | Manchester | 64-bit, XOR checksum |
+| **Honda/Acura** | Honda Civic, CR-V, Accord (2007+) / Acura TL, MDX, RDX | PWM | 64-bit, CRC-8 0x2F |
+| **Hyundai New** | Hyundai all models (2017+), Genesis all models | PWM | 64-bit, CRC-8 0x31 |
 | **Nissan** | Nissan, Infiniti (2003–2018) | PWM | 64-bit, CRC-8 0x97 |
 | **Renault** | Renault, Dacia — Clio/Megane/Duster (2005–2020) | PCM biphase | 64-bit, XOR checksum |
 | **Toyota/Lexus** | Corolla, Camry, RAV4, Hilux, Land Cruiser, Lexus IS/RX/GS (2003–2020) | PWM | 72-bit, CRC-8 0xEA |
 
 > ARF already has a `toyota.c` covering older Corolla Verso (2004–2010) and Tundra (2011) variants.
 > Our `toyota_lexus.c` covers a different, newer frame format — both coexist in this firmware.
+>
+> Older Hyundai models (pre-2017) are already covered by the KIA V0–V7 variants already in ARF.
 
 Everything else — all 64 ARF protocols, the automotive scanner, car-key emulator, custom button support, Keeloq extensions, AES/AUT64/TEA crypto — is unchanged from ARF upstream.
 
@@ -65,9 +69,9 @@ A GitHub Actions bot checks for new ARF releases every 6 hours. When a new build
 
 ---
 
-## Full protocol list (68 total)
+## Full protocol list (70 total)
 
-### Automotive RKE (our 4 additions marked ★)
+### Automotive RKE (our 6 additions marked ★)
 
 | Brand | Protocol(s) |
 |---|---|
@@ -76,7 +80,8 @@ A GitHub Actions bot checks for new ARF releases every 6 hours. When a new build
 | Fiat / Alfa / Lancia | Fiat Marelli, Fiat SPA |
 | Ford / Lincoln | Ford V0, V1, V2, V3 |
 | ★ GM / Chevrolet / Buick / Cadillac | GM Rolling |
-| Hyundai / Kia | KIA V0, V1, V2, V3/V4, V5, V6, V7 |
+| ★ Honda / Acura | Honda/Acura (2007+) |
+| Hyundai / Kia | KIA V0, V1, V2, V3/V4, V5, V6, V7, ★ Hyundai New (2017+) |
 | Land Rover | Land Rover V0 |
 | Mazda | Mazda V0, Mazda Siemens |
 | Mitsubishi | Mitsubishi V0 |
@@ -115,15 +120,17 @@ git clone --depth 1 https://github.com/D4C1-Labs/Flipper-ARF.git
 cd Flipper-ARF
 git submodule update --init --recursive --depth 1
 
-# Add our 4 protocols
+# Add our 6 protocols
 cp /path/to/ARF-Shuka-Edition/new_files/gm_rolling.{c,h}    lib/subghz/protocols/
+cp /path/to/ARF-Shuka-Edition/new_files/honda_acura.{c,h}   lib/subghz/protocols/
+cp /path/to/ARF-Shuka-Edition/new_files/hyundai_new.{c,h}   lib/subghz/protocols/
 cp /path/to/ARF-Shuka-Edition/new_files/nissan.{c,h}         lib/subghz/protocols/
 cp /path/to/ARF-Shuka-Edition/new_files/renault.{c,h}        lib/subghz/protocols/
 cp /path/to/ARF-Shuka-Edition/new_files/toyota_lexus.{c,h}   lib/subghz/protocols/
 
 # Register them in the protocol list
-sed -i 's|#include "toyota.h"|#include "toyota.h"\n#include "gm_rolling.h"\n#include "nissan.h"\n#include "renault.h"\n#include "toyota_lexus.h"|' lib/subghz/protocols/protocol_items.h
-sed -i '/subghz_protocol_toyota,$/a\    \&subghz_protocol_toyota_lexus,\n    \&subghz_protocol_gm_rolling,\n    \&subghz_protocol_nissan,\n    \&subghz_protocol_renault,' lib/subghz/protocols/protocol_items.c
+sed -i 's|#include "toyota.h"|#include "toyota.h"\n#include "gm_rolling.h"\n#include "honda_acura.h"\n#include "hyundai_new.h"\n#include "nissan.h"\n#include "renault.h"\n#include "toyota_lexus.h"|' lib/subghz/protocols/protocol_items.h
+sed -i '/subghz_protocol_toyota,$/a\    \&subghz_protocol_toyota_lexus,\n    \&subghz_protocol_gm_rolling,\n    \&subghz_protocol_honda_acura,\n    \&subghz_protocol_hyundai_new,\n    \&subghz_protocol_nissan,\n    \&subghz_protocol_renault,' lib/subghz/protocols/protocol_items.c
 
 ./fbt COMPACT=1 DEBUG=0 DIST_SUFFIX="arf-shuka-edition" updater_package
 ```
@@ -137,9 +144,9 @@ CI does this automatically on every push — see [`.github/workflows/build.yml`]
 | Firmware | Size | Margin |
 |---|---|---|
 | ARF upstream | ~855 KB | ~5 KB |
-| ARF-Shuka-Edition | ~858 KB | ~2 KB |
+| ARF-Shuka-Edition | ~860 KB | ~0 KB |
 
-The STM32WB55 C2 (Bluetooth coprocessor) flash boundary sits around 860 KB.
+The STM32WB55 C2 (Bluetooth coprocessor) flash boundary sits at **860 KB** (0x080D7000). CI enforces this limit — the build fails automatically if the firmware exceeds it.
 
 ---
 
