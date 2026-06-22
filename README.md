@@ -112,7 +112,7 @@ RAW · BIN RAW
 
 ---
 
-## Recovery (Flipper not responding / bricked)
+## Recovery (If Flipper is not responding / bricked)
 
 If your Flipper won't boot, isn't detected by qFlipper or `dfu-util`, and normal button combos don't work, use this sequence to force the STM32 hardware boot ROM into recovery mode — **no tools or case opening required**.
 
