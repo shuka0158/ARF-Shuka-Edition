@@ -67,6 +67,17 @@ jobs:
           done
           echo "Modified files applied"
 
+      - name: Customize firmware branding
+        run: |
+          # Replace "ARF-Firmware" firmware name with "Shuka-ARF" in all source files
+          grep -rl "ARF-Firmware" flipper-fw/ \
+            --include="*.c" --include="*.h" --include="*.py" --include="*.scons" \
+            2>/dev/null | xargs -r sed -i 's/ARF-Firmware/Shuka-ARF/g'
+          echo "Firmware name patched"
+
+          # Patch about.c to add attribution lines
+          python3 shuka-edition/scripts/patch_about.py
+
       - name: Strip low-coverage ARF protocols to recover flash space
         run: |
           PROTO=flipper-fw/lib/subghz/protocols
