@@ -95,10 +95,6 @@ jobs:
           cp $SHUKA/new_files/honda_acura.c  $PROTO/
           cp $SHUKA/new_files/honda_acura.h  $PROTO/
 
-          # Volvo RKE (S40/V70/XC90 2001-2017, 433 MHz, XOR checksum)
-          cp $SHUKA/new_files/volvo.c        $PROTO/
-          cp $SHUKA/new_files/volvo.h        $PROTO/
-
           # Hyundai New RKE (2017+ Hyundai/Genesis, 433 MHz, CRC-8 poly 0x31)
           cp $SHUKA/new_files/hyundai_new.c  $PROTO/
           cp $SHUKA/new_files/hyundai_new.h  $PROTO/
@@ -109,7 +105,7 @@ jobs:
             exit 1
           fi
           sed -i \
-            's|#include "toyota.h"|#include "toyota.h"\n#include "gm_rolling.h"\n#include "nissan.h"\n#include "renault.h"\n#include "toyota_lexus.h"\n#include "honda_acura.h"\n#include "volvo.h"\n#include "hyundai_new.h"|' \
+            's|#include "toyota.h"|#include "toyota.h"\n#include "gm_rolling.h"\n#include "nissan.h"\n#include "renault.h"\n#include "toyota_lexus.h"\n#include "honda_acura.h"\n#include "hyundai_new.h"|' \
             $PROTO/protocol_items.h
           grep -q '#include "gm_rolling.h"' $PROTO/protocol_items.h || { echo "ERROR: header patch failed" >&2; exit 1; }
 
@@ -118,7 +114,7 @@ jobs:
             echo "ERROR: subghz_protocol_toyota entry not found in protocol_items.c — ARF changed its layout" >&2
             exit 1
           fi
-          sed -i '/subghz_protocol_toyota,$/a\    \&subghz_protocol_toyota_lexus,\n    \&subghz_protocol_gm_rolling,\n    \&subghz_protocol_nissan,\n    \&subghz_protocol_renault,\n    \&subghz_protocol_honda_acura,\n    \&subghz_protocol_volvo,\n    \&subghz_protocol_hyundai_new,' \
+          sed -i '/subghz_protocol_toyota,$/a\    \&subghz_protocol_toyota_lexus,\n    \&subghz_protocol_gm_rolling,\n    \&subghz_protocol_nissan,\n    \&subghz_protocol_renault,\n    \&subghz_protocol_honda_acura,\n    \&subghz_protocol_hyundai_new,' \
             $PROTO/protocol_items.c
           grep -q 'subghz_protocol_gm_rolling' $PROTO/protocol_items.c || { echo "ERROR: protocol_items.c patch failed" >&2; exit 1; }
 
