@@ -70,63 +70,45 @@ INJECT = f"""
 // from assets/icons/Passport/{{}}<char>_<mood>N_46x49.png
 
 extern const Icon I_skull_happy1_46x49;
-extern const Icon I_skull_happy2_46x49;
-extern const Icon I_skull_happy3_46x49;
 extern const Icon I_skull_okay1_46x49;
-extern const Icon I_skull_okay2_46x49;
-extern const Icon I_skull_okay3_46x49;
 extern const Icon I_skull_bad1_46x49;
-extern const Icon I_skull_bad2_46x49;
-extern const Icon I_skull_bad3_46x49;
 
 extern const Icon I_hacker_happy1_46x49;
-extern const Icon I_hacker_happy2_46x49;
-extern const Icon I_hacker_happy3_46x49;
 extern const Icon I_hacker_okay1_46x49;
-extern const Icon I_hacker_okay2_46x49;
-extern const Icon I_hacker_okay3_46x49;
 extern const Icon I_hacker_bad1_46x49;
-extern const Icon I_hacker_bad2_46x49;
-extern const Icon I_hacker_bad3_46x49;
 
 extern const Icon I_robot_happy1_46x49;
-extern const Icon I_robot_happy2_46x49;
-extern const Icon I_robot_happy3_46x49;
 extern const Icon I_robot_okay1_46x49;
-extern const Icon I_robot_okay2_46x49;
-extern const Icon I_robot_okay3_46x49;
 extern const Icon I_robot_bad1_46x49;
-extern const Icon I_robot_bad2_46x49;
-extern const Icon I_robot_bad3_46x49;
 
 static const Icon* shuka_passport_get_icon(uint8_t mood, uint8_t variant) {{
-    // mood: 0=happy, 1=okay, 2=bad   variant: 0-2
+    // mood: 0=happy, 1=okay, 2=bad   variant: unused (1 frame per mood)
+    (void)variant;
     DesktopSettings _sp_settings = {{0}};
     desktop_settings_load(&_sp_settings);
     uint8_t ch = _sp_settings.passport_char;
 
-    static const Icon* skull_icons[3][3] = {{
-        {{&I_skull_happy1_46x49, &I_skull_happy2_46x49, &I_skull_happy3_46x49}},
-        {{&I_skull_okay1_46x49,  &I_skull_okay2_46x49,  &I_skull_okay3_46x49}},
-        {{&I_skull_bad1_46x49,   &I_skull_bad2_46x49,   &I_skull_bad3_46x49}},
+    static const Icon* skull_icons[3] = {{
+        &I_skull_happy1_46x49,
+        &I_skull_okay1_46x49,
+        &I_skull_bad1_46x49,
     }};
-    static const Icon* hacker_icons[3][3] = {{
-        {{&I_hacker_happy1_46x49, &I_hacker_happy2_46x49, &I_hacker_happy3_46x49}},
-        {{&I_hacker_okay1_46x49,  &I_hacker_okay2_46x49,  &I_hacker_okay3_46x49}},
-        {{&I_hacker_bad1_46x49,   &I_hacker_bad2_46x49,   &I_hacker_bad3_46x49}},
+    static const Icon* hacker_icons[3] = {{
+        &I_hacker_happy1_46x49,
+        &I_hacker_okay1_46x49,
+        &I_hacker_bad1_46x49,
     }};
-    static const Icon* robot_icons[3][3] = {{
-        {{&I_robot_happy1_46x49, &I_robot_happy2_46x49, &I_robot_happy3_46x49}},
-        {{&I_robot_okay1_46x49,  &I_robot_okay2_46x49,  &I_robot_okay3_46x49}},
-        {{&I_robot_bad1_46x49,   &I_robot_bad2_46x49,   &I_robot_bad3_46x49}},
+    static const Icon* robot_icons[3] = {{
+        &I_robot_happy1_46x49,
+        &I_robot_okay1_46x49,
+        &I_robot_bad1_46x49,
     }};
 
     uint8_t m = (mood < 3) ? mood : 0;
-    uint8_t v = (variant < 3) ? variant : 0;
 
-    if(ch == 1) return skull_icons[m][v];
-    if(ch == 2) return hacker_icons[m][v];
-    if(ch == 3) return robot_icons[m][v];
+    if(ch == 1) return skull_icons[m];
+    if(ch == 2) return hacker_icons[m];
+    if(ch == 3) return robot_icons[m];
     return NULL; // 0 = dolphin: caller uses original I_passport_* icons
 }}
 // ─────────────────────────────────────────────────────────────────────────────

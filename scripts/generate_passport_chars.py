@@ -280,10 +280,8 @@ sets = {
 for char, variants in sets.items():
     for mood, fn in variants:
         img = fn()
-        # Save 3 identical variants per mood (Flipper expects 1/2/3 suffix)
-        for n in range(1, 4):
-            fname = f"{char}_{mood}{n}_46x49.png"
-            img.save(os.path.join(OUT, fname))
-            print(f"Saved {fname}")
+        fname = f"{char}_{mood}1_46x49.png"
+        img.save(os.path.join(OUT, fname))
+        print(f"Saved {fname}")
 
 print(f"\nAll passport characters saved to {OUT}/")

@@ -217,13 +217,13 @@ jobs:
 
       - name: Check firmware size
         run: |
-          DFU=$(find flipper-fw/dist -name "*.dfu" 2>/dev/null | head -1)
-          if [ -n "$DFU" ]; then
-            bash shuka-edition/scripts/check_size.sh "$DFU"
-          else
-            echo "No .dfu found in dist/ — checking build output"
-            find flipper-fw -name "*.dfu" | head -5
+          DFU=$(find flipper-fw/dist -name "flipper-z-f7-full-*.dfu" 2>/dev/null | head -1)
+          if [ -z "$DFU" ]; then
+            echo "ERROR: main firmware DFU (flipper-z-f7-full-*.dfu) not found in dist/" >&2
+            find flipper-fw/dist -name "*.dfu" | sort
+            exit 1
           fi
+          bash shuka-edition/scripts/check_size.sh "$DFU"
 
       - name: Collect artifacts
         run: |
