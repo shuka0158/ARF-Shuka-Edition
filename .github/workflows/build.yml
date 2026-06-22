@@ -173,19 +173,6 @@ jobs:
         env:
           PYTHONUNBUFFERED: "1"
 
-      - name: Customize SubGHz reading screen (Heisenberg)
-        run: |
-          pip3 install -q Pillow
-          ICONS=flipper-fw/assets/icons/SubGhz
-
-          # Generate band-specific icons: Heisenberg (433), key fob (315), tower (868)
-          python3 shuka-edition/scripts/generate_heisenberg.py "$ICONS"
-          echo "Band art icons written to $ICONS/"
-
-          # Patch receiver.c to draw Heisenberg on the left half of the scan idle screen
-          python3 shuka-edition/scripts/patch_receiver.py
-        env:
-          PYTHONUNBUFFERED: "1"
 
       - name: Generate and embed custom passport characters
         run: |
