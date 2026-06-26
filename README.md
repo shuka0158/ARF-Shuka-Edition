@@ -106,9 +106,24 @@ RAW · BIN RAW
 
 ## Quick start
 
-1. Download the latest `.dfu` from [Releases](../../releases)
-2. Open **qFlipper → Install from file** → select the `.dfu`
-3. Done
+### Recommended — full install (firmware + apps)
+
+1. Go to [Releases](../../releases) and download **`flipper-z-f7-update-arf-shuka-edition.tgz`**
+2. Open **qFlipper → Install from file** → select the `.tgz`
+3. Done — firmware and all apps are updated in one step
+
+### Firmware only (no SD card changes)
+
+Download **`flipper-z-f7-full-arf-shuka-edition.dfu`** instead and install the same way.
+Use this if you just want to update the firmware binary without touching your SD card.
+
+### What's in each release file
+
+| File | What it does |
+|---|---|
+| `flipper-z-f7-update-arf-shuka-edition.tgz` | **Full install** — firmware + Infrared, NFC, RFID, GPIO, Bad USB, U2F apps |
+| `flipper-z-f7-full-arf-shuka-edition.dfu` | Firmware binary only |
+| `ARF-Shuka-animations.zip` | Custom idle animations — copy to SD card manually if you want them |
 
 ---
 
