@@ -265,8 +265,17 @@ jobs:
             echo "Generated update.fuf:"
             cat "$UPDATE_DIR/update.fuf"
 
+            # Slim down resources.ths to only core FAPs so qFlipper's MD5
+            # check finishes in time. Users' existing SD card apps are untouched
+            # (Flipper updater only overwrites files present in resources.ths).
+            RESOURCES_THS="$UPDATE_DIR/resources.ths"
+            if [ -f "$RESOURCES_THS" ]; then
+              pip3 install -q heatshrink2
+              python3 shuka-edition/scripts/slim_resources.py "$RESOURCES_THS"
+              echo "resources.ths slimmed OK"
+            fi
+
             BUNDLE_NAME="flipper-z-f7-update-arf-shuka-edition.tgz"
-            # Include resources.ths so OTA install also updates SD card FAPs
             tar -czf "artifacts/${BUNDLE_NAME}" \
               --exclude='*/radio.bin' \
               -C "$(dirname "$UPDATE_DIR")" "$(basename "$UPDATE_DIR")"
