@@ -244,13 +244,8 @@ jobs:
             # Output is little-endian hex bytes separated by spaces (e.g. "AB CD EF 12").
             UPDATER_BIN=$(find "$UPDATE_DIR" -name "updater.bin" | head -1)
             if [ -n "$UPDATER_BIN" ]; then
-              LOADER_CRC=$(python3 -c "
-import struct, zlib, sys
-data = open('$UPDATER_BIN','rb').read()
-crc = zlib.crc32(data) & 0xFFFFFFFF
-print(' '.join(f'{b:02X}' for b in struct.pack('<I', crc)))
-")
-              LOADER_LINE="Loader: updater.bin"$'\n'"Loader CRC: $LOADER_CRC"
+              LOADER_CRC=$(python3 -c "import struct,zlib; d=open('${UPDATER_BIN}','rb').read(); print(' '.join(f'{b:02X}' for b in struct.pack('<I',zlib.crc32(d)&0xFFFFFFFF)))")
+              LOADER_LINE=$'Loader: updater.bin\n'"Loader CRC: $LOADER_CRC"
             else
               echo "WARNING: updater.bin not found — omitting Loader fields"
               LOADER_LINE=""
