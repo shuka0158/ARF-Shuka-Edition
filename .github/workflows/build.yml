@@ -240,17 +240,40 @@ jobs:
             echo "Update directory: $UPDATE_DIR"
             ls -la "$UPDATE_DIR/"
 
-            # Generate the manifest the Flipper Software Updater needs.
-            # Firmware only — no radio (stays unchanged), no resources (12MB+, too slow for WebSerial).
-            printf '[update]\ninfo=ARF-Shuka-Edition\ntarget=7\nmanifest_version=2\nfirmware=firmware.dfu\n' \
-              > "$UPDATE_DIR/update.fuf"
+            # Compute CRC32 of updater.bin (required by Flipper Format manifest).
+            # Output is little-endian hex bytes separated by spaces (e.g. "AB CD EF 12").
+            UPDATER_BIN=$(find "$UPDATE_DIR" -name "updater.bin" | head -1)
+            if [ -n "$UPDATER_BIN" ]; then
+              LOADER_CRC=$(python3 -c "
+import struct, zlib, sys
+data = open('$UPDATER_BIN','rb').read()
+crc = zlib.crc32(data) & 0xFFFFFFFF
+print(' '.join(f'{b:02X}' for b in struct.pack('<I', crc)))
+")
+              LOADER_LINE="Loader: updater.bin"$'\n'"Loader CRC: $LOADER_CRC"
+            else
+              echo "WARNING: updater.bin not found — omitting Loader fields"
+              LOADER_LINE=""
+            fi
+
+            # Generate update.fuf in Flipper Format (not INI).
+            {
+              echo "Filetype: Flipper firmware upgrade configuration"
+              echo "Version: 2"
+              echo "Info: ARF-Shuka-Edition"
+              echo "Target: 7"
+              [ -n "$LOADER_LINE" ] && echo "$LOADER_LINE"
+              echo "Firmware: firmware.dfu"
+              # Include splashscreen if present
+              [ -f "$UPDATE_DIR/splash.bin" ] && echo "Splashscreen: splash.bin"
+            } > "$UPDATE_DIR/update.fuf"
             echo "Generated update.fuf:"
             cat "$UPDATE_DIR/update.fuf"
 
             BUNDLE_NAME="flipper-z-f7-update-arf-shuka-edition.tgz"
-            # Exclude resources.ths (12MB+) — firmware.dfu + update.fuf is enough for web flash
+            # Exclude resources.ths (12MB+) — keep updater.bin for valid OTA
             tar -czf "artifacts/${BUNDLE_NAME}" \
-              --exclude='*/resources.ths' --exclude='*/radio.bin' --exclude='*/updater.bin' \
+              --exclude='*/resources.ths' --exclude='*/radio.bin' \
               -C "$(dirname "$UPDATE_DIR")" "$(basename "$UPDATE_DIR")"
             echo "Created OTA bundle: ${BUNDLE_NAME} ($(du -sh artifacts/${BUNDLE_NAME} | cut -f1))"
           else
