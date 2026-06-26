@@ -54,6 +54,18 @@ jobs:
           git tag "ARF-Shuka-Edition"
           git describe --tags --always
 
+      - name: Add missing apps (bad_usb, u2f) from official Flipper firmware
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/flipperdevices/flipperzero-firmware.git flipper-official
+          cd flipper-official
+          git sparse-checkout set applications/main/bad_usb applications/main/u2f
+          cd ..
+          cp -r flipper-official/applications/main/bad_usb flipper-fw/applications/main/
+          cp -r flipper-official/applications/main/u2f    flipper-fw/applications/main/
+          rm -rf flipper-official
+          echo "bad_usb and u2f sources added"
+
       - name: Apply Shuka-Edition modified files
         run: |
           REPO=flipper-fw
