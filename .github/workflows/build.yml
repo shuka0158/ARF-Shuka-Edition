@@ -266,9 +266,9 @@ jobs:
             cat "$UPDATE_DIR/update.fuf"
 
             BUNDLE_NAME="flipper-z-f7-update-arf-shuka-edition.tgz"
-            # Exclude resources.ths (12MB+) — keep updater.bin for valid OTA
+            # Include resources.ths so OTA install also updates SD card FAPs
             tar -czf "artifacts/${BUNDLE_NAME}" \
-              --exclude='*/resources.ths' --exclude='*/radio.bin' \
+              --exclude='*/radio.bin' \
               -C "$(dirname "$UPDATE_DIR")" "$(basename "$UPDATE_DIR")"
             echo "Created OTA bundle: ${BUNDLE_NAME} ($(du -sh artifacts/${BUNDLE_NAME} | cut -f1))"
           else
