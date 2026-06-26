@@ -2,7 +2,7 @@
 """Repack resources.ths keeping only core FAPs so qFlipper's MD5 check doesn't time out."""
 import sys, heatshrink2, tarfile, io, os
 
-CORE_FAPS = {'infrared.fap', 'nfc.fap', 'lfrfid.fap', 'gpio.fap'}
+CORE_FAPS = {'infrared.fap', 'nfc.fap', 'lfrfid.fap', 'gpio.fap', 'bad_usb.fap', 'u2f.fap'}
 
 src_path = sys.argv[1]
 raw = open(src_path, 'rb').read()
