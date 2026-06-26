@@ -45,6 +45,9 @@ jobs:
           git add ARF_VERSION
           git commit -m "chore: sync to ARF $TAG"
           git push
-          echo "Pushed ARF_VERSION=$TAG — build.yml will now fire and release ARF-Shuka-Edition based on $TAG"
+          echo "Pushed ARF_VERSION=$TAG"
+          # GITHUB_TOKEN pushes don't trigger other workflows — fire build explicitly
+          gh workflow run build.yml --ref main
+          echo "Triggered build.yml for $TAG"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
