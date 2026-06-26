@@ -339,8 +339,16 @@ jobs:
 
             **Based on ARF:** `${{ env.ARF_TAG }}`
 
-            Flash with qFlipper (`.dfu`) or OTA via the update bundle (`.tgz`).
+            ### How to install
 
-            See [README](README.md) for full flashing instructions and protocol list.
+            **Recommended — download `flipper-z-f7-update-arf-shuka-edition.tgz`**
+            Open qFlipper → Install from file → select the `.tgz`
+            Updates firmware + Infrared, NFC, RFID, GPIO, Bad USB, U2F apps in one step.
+
+            **Firmware only — download `flipper-z-f7-full-arf-shuka-edition.dfu`**
+            Open qFlipper → Install from file → select the `.dfu`
+            Updates the firmware binary only, does not touch your SD card.
+
+            See [README](README.md) for full instructions and protocol list.
           draft: false
           prerelease: false
