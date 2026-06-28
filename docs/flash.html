@@ -170,7 +170,7 @@ const UPDATE_DIR = '/ext/update/f7-update-arf-shuka-edition';
 class Flipper {
   constructor(port) { this.port = port; this.rxBuf = new Uint8Array(0); this._stopped = false; }
 
-  async open() {
+  async open(onStatus) {
     this.writer = this.port.writable.getWriter();
     const reader = this.port.readable.getReader();
     // Async pump — continuously fills rxBuf
@@ -183,39 +183,49 @@ class Flipper {
         } catch { break; }
       }
     })();
-    // Ctrl+C to interrupt any active CLI operation, then flush
-    await this.writer.write(new Uint8Array([0x03]));
-    await sleep(200);
+    // Give USB CDC a moment to settle
+    await sleep(300);
     this.rxBuf = new Uint8Array(0);
-    // Switch to RPC mode and wait for all CLI echo to arrive
+    // Switch to RPC mode
+    onStatus?.('Sending start_rpc_session…');
     await this.writer.write(te.encode('\r\nstart_rpc_session\r\n'));
-    await sleep(1000);
+    await sleep(1200);
+    const echoBytes = this.rxBuf.length;
+    const echoHex   = Array.from(this.rxBuf.slice(0,32)).map(b=>b.toString(16).padStart(2,'0')).join(' ');
+    onStatus?.(`CLI echo: ${echoBytes} bytes → ${echoHex || '(none)'}`);
     this.rxBuf = new Uint8Array(0);
     await sleep(300);
     this.rxBuf = new Uint8Array(0);
-    // Verify RPC is actually active with a ping
-    await this._ping();
+    // Verify RPC is active
+    await this._ping(onStatus);
   }
 
   // system_ping_request = field 5, PingRequest.data = field 1 (bytes)
-  async _ping() {
+  async _ping(onStatus) {
     const id = newId();
     const pkt = wrap_main(id, false, fb(5, fb(1, new Uint8Array([0xDE, 0xAD]))));
+    onStatus?.(`Sending ping (cmd_id=${id})…`);
     await this.writer.write(pkt);
-    const deadline = Date.now() + 5000;
+    const deadline = Date.now() + 6000;
     while (Date.now() < deadline) {
+      if (this.rxBuf.length > 0) {
+        const hex = Array.from(this.rxBuf.slice(0,16)).map(b=>b.toString(16).padStart(2,'0')).join(' ');
+        onStatus?.(`Ping rx ${this.rxBuf.length} bytes: ${hex}`);
+      }
       if (this.rxBuf.length >= 4) {
         const len = new DataView(this.rxBuf.buffer, this.rxBuf.byteOffset, 4).getUint32(0, true);
         if (len > 65535) { this.rxBuf = this.rxBuf.slice(1); continue; }
         if (this.rxBuf.length >= 4 + len) {
           const msg = parse_main(this.rxBuf.slice(4, 4+len));
           this.rxBuf = this.rxBuf.slice(4+len);
-          if (msg.cmd_id === id) return; // got our ping response
+          onStatus?.(`Ping resp: cmd_id=${msg.cmd_id} status=${msg.cmd_status}`);
+          if (msg.cmd_id === id) return;
         }
       }
       await sleep(20);
     }
-    throw new Error('Flipper did not respond to ping — make sure the Flipper is on the home screen (not in a running app) and try again.');
+    const lastHex = Array.from(this.rxBuf.slice(0,32)).map(b=>b.toString(16).padStart(2,'0')).join(' ');
+    throw new Error(`Ping timeout. rxBuf at timeout: ${this.rxBuf.length} bytes → ${lastHex||'(empty)'}. Make sure Flipper is on the HOME SCREEN.`);
   }
 
   async close() {
@@ -309,8 +319,8 @@ async function doFlash() {
     await port.open({ baudRate: 230400 });
     flipper = new Flipper(port);
     setStatus('Starting RPC session… (Flipper must be on home screen)');
-    await flipper.open();
-    setStatus('RPC verified.');
+    await flipper.open(setStatus);
+    setStatus('RPC verified ✓');
     setProgress(0.03);
 
     /* 2. Download bundle */
