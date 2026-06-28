@@ -183,10 +183,17 @@ class Flipper {
         } catch { break; }
       }
     })();
+    // Send Ctrl+C to interrupt any ongoing CLI operation
+    await this.writer.write(new Uint8Array([0x03]));
+    await sleep(150);
+    this.rxBuf = new Uint8Array(0);
     // Switch to RPC mode
     await this.writer.write(te.encode('\r\nstart_rpc_session\r\n'));
-    await sleep(600);
-    this.rxBuf = new Uint8Array(0); // discard CLI echo
+    // Wait long enough for all CLI echo + mode-switch bytes to arrive, then flush twice
+    await sleep(1000);
+    this.rxBuf = new Uint8Array(0);
+    await sleep(200);
+    this.rxBuf = new Uint8Array(0);
   }
 
   async close() {
@@ -196,13 +203,19 @@ class Flipper {
   }
 
   async _pkt() {
-    while (this.rxBuf.length < 4) await sleep(5);
-    const len = new DataView(this.rxBuf.buffer, this.rxBuf.byteOffset, 4).getUint32(0, true);
-    if (len > 4_000_000) throw new Error(`Unexpected RPC packet length ${len} — lost sync`);
-    while (this.rxBuf.length < 4 + len) await sleep(5);
-    const msg = parse_main(this.rxBuf.slice(4, 4+len));
-    this.rxBuf = this.rxBuf.slice(4+len);
-    return msg;
+    for (;;) {
+      while (this.rxBuf.length < 4) await sleep(5);
+      const len = new DataView(this.rxBuf.buffer, this.rxBuf.byteOffset, 4).getUint32(0, true);
+      if (len > 65535) {
+        // Out of sync (CLI echo / stale bytes) — skip one byte and rescan
+        this.rxBuf = this.rxBuf.slice(1);
+        continue;
+      }
+      while (this.rxBuf.length < 4 + len) await sleep(5);
+      const msg = parse_main(this.rxBuf.slice(4, 4+len));
+      this.rxBuf = this.rxBuf.slice(4+len);
+      return msg;
+    }
   }
 
   async _wait(id, allowStatus = new Set([0])) {
