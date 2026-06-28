@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ARF-Shuka-Edition Web Flasher</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:monospace;background:#0a0a0a;color:#e0e0e0;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1.5rem}
+main{max-width:480px;width:100%}
+h1{font-size:1.5rem;color:#ff8c00;letter-spacing:.05em}
+.sub{color:#555;font-size:.8rem;margin-bottom:1.5rem;margin-top:.2rem}
+.card{background:#111;border:1px solid #222;border-radius:8px;padding:.9rem 1rem;margin-bottom:1.2rem;font-size:.8rem;line-height:1.7;color:#888}
+.card b{color:#ccc}
+.card .val{color:#ff8c00}
+#flashBtn{width:100%;padding:.8rem;background:#ff8c00;color:#000;border:none;border-radius:6px;font-family:monospace;font-size:1rem;font-weight:bold;cursor:pointer;letter-spacing:.03em;transition:opacity .15s}
+#flashBtn:disabled{opacity:.35;cursor:not-allowed}
+#flashBtn:hover:not(:disabled){opacity:.82}
+.prog-wrap{margin-top:1rem;display:none}
+progress{width:100%;height:6px;appearance:none;border:none;border-radius:3px;background:#1e1e1e}
+progress::-webkit-progress-bar{background:#1e1e1e;border-radius:3px}
+progress::-webkit-progress-value{background:#ff8c00;border-radius:3px;transition:width .25s}
+#status{margin-top:.5rem;font-size:.75rem;color:#666;min-height:1.1em;word-break:break-all}
+#status.err{color:#e05555}
+#status.ok{color:#55c55a}
+.note{margin-top:1.4rem;font-size:.72rem;color:#444;line-height:1.6}
+.note a{color:#555;text-decoration:none}
+.note a:hover{color:#888}
+</style>
+</head>
+<body>
+<main>
+  <h1>ARF-Shuka-Edition</h1>
+  <p class="sub">Web Flasher &mdash; Chrome / Edge only</p>
+
+  <div class="card" id="versionBox">Loading version info&hellip;</div>
+
+  <button id="flashBtn">&#9889; Connect &amp; Flash Flipper</button>
+
+  <div class="prog-wrap" id="progWrap">
+    <progress id="prog" value="0" max="100"></progress>
+    <div id="status"></div>
+  </div>
+
+  <p class="note">
+    Requires <a href="https://caniuse.com/web-serial" target="_blank">WebSerial</a> (Chrome&nbsp;89+, Edge&nbsp;89+).
+    Firefox is not supported.<br>
+    Plug in your Flipper before clicking Flash.
+    Do not unplug during install (~30 s after trigger).
+  </p>
+</main>
+
+<script src="https://unpkg.com/pako@2.1.0/dist/pako.min.js"></script>
+<script>
+'use strict';
+
+/* ── helpers ──────────────────────────────────────────────────────────────── */
+const te  = new TextEncoder();
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function concat(...arrs) {
+  const n = arrs.reduce((s,a) => s+a.length, 0);
+  const r = new Uint8Array(n); let p = 0;
+  for (const a of arrs) { r.set(a,p); p += a.length; }
+  return r;
+}
+
+/* ── protobuf encoder ─────────────────────────────────────────────────────── */
+function varint(n) {
+  n = n >>> 0;
+  const b = [];
+  while (n > 127) { b.push((n & 0x7F) | 0x80); n >>>= 7; }
+  b.push(n);
+  return new Uint8Array(b);
+}
+const fv = (num, v) => concat(varint((num<<3)|0), varint(v));
+const fb = (num, b) => concat(varint((num<<3)|2), varint(b.length), b);
+const fs = (num, s) => fb(num, te.encode(s));
+
+/* ── protobuf decoder (Main fields only) ──────────────────────────────────── */
+function read_varint(buf, pos) {
+  let val = 0, shift = 0, b;
+  do { b = buf[pos++]; val |= (b & 0x7F) << shift; shift += 7; } while (b & 0x80);
+  return [val >>> 0, pos];
+}
+function parse_main(buf) {
+  let pos = 0, cmd_id = 0, cmd_status = 0, has_next = false;
+  while (pos < buf.length) {
+    const [tag, p1] = read_varint(buf, pos); pos = p1;
+    const fnum = tag >> 3, wtype = tag & 7;
+    if (wtype === 0) {
+      const [val, p2] = read_varint(buf, pos); pos = p2;
+      if (fnum === 1) cmd_id     = val;
+      if (fnum === 2) cmd_status = val;
+      if (fnum === 3) has_next   = !!val;
+    } else if (wtype === 2) {
+      const [len, p2] = read_varint(buf, pos); pos = p2 + len;
+    } else break;
+  }
+  return { cmd_id, cmd_status, has_next };
+}
+
+/* ── RPC packet builders ──────────────────────────────────────────────────── */
+let _id = 1;
+const newId = () => _id++;
+
+function wrap_main(id, hasNext, content) {
+  const main = concat(fv(1,id), hasNext ? fv(3,1) : new Uint8Array(), content);
+  const hdr  = new Uint8Array(4);
+  new DataView(hdr.buffer).setUint32(0, main.length, true);
+  return concat(hdr, main);
+}
+
+// Storage.MkdirRequest (field 13 in Main), path = field 1
+function mkdir_pkt(path) {
+  const id = newId();
+  return [id, wrap_main(id, false, fb(13, fs(1, path)))];
+}
+
+// Storage.DeleteRequest (field 12), path=1 recursive=2
+function delete_pkt(path, recursive) {
+  const id = newId();
+  return [id, wrap_main(id, false, fb(12, concat(fs(1,path), recursive ? fv(2,1) : new Uint8Array())))];
+}
+
+// System.UpdateRequest (field 41), update_manifest=1
+function update_pkt(manifest) {
+  const id = newId();
+  return [id, wrap_main(id, false, fb(41, fs(1, manifest)))];
+}
+
+// Storage.WriteRequest (field 11), path=1 file=2 ; File.data=4
+// Returns [id, array_of_packets]
+function write_pkts(path, data) {
+  const CHUNK = 4096;
+  const id    = newId();
+  const pkts  = [];
+  for (let off = 0; off < data.length; off += CHUNK) {
+    const chunk   = data.slice(off, off + CHUNK);
+    const hasNext = off + CHUNK < data.length;
+    const wreq    = concat(
+      off === 0 ? fs(1, path) : new Uint8Array(),
+      fb(2, fb(4, chunk))
+    );
+    pkts.push(wrap_main(id, hasNext, fb(11, wreq)));
+  }
+  return [id, pkts];
+}
+
+/* ── TAR extractor ────────────────────────────────────────────────────────── */
+function extract_tar(buf) {
+  const dec = new TextDecoder();
+  const str = (s, l) => { let e=s; while(e<s+l&&buf[e])e++; return dec.decode(buf.slice(s,e)); };
+  const files = {};
+  let off = 0;
+  while (off + 512 <= buf.length) {
+    const name = str(off, 100); if (!name) break;
+    const size = parseInt(str(off+124,12).trim()||'0', 8);
+    const type = String.fromCharCode(buf[off+156]||0);
+    off += 512;
+    if ((type==='0'||type==='\0') && size>0) files[name] = buf.slice(off, off+size);
+    off += Math.ceil(size/512)*512;
+  }
+  return files;
+}
+
+/* ── Flipper RPC class ────────────────────────────────────────────────────── */
+const UPDATE_DIR = '/ext/update/f7-update-arf-shuka-edition';
+
+class Flipper {
+  constructor(port) { this.port = port; this.rxBuf = new Uint8Array(0); this._stopped = false; }
+
+  async open() {
+    this.writer = this.port.writable.getWriter();
+    const reader = this.port.readable.getReader();
+    // Async pump — continuously fills rxBuf
+    this._pump = (async () => {
+      while (!this._stopped) {
+        try {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value) this.rxBuf = concat(this.rxBuf, value);
+        } catch { break; }
+      }
+    })();
+    // Switch to RPC mode
+    await this.writer.write(te.encode('\r\nstart_rpc_session\r\n'));
+    await sleep(600);
+    this.rxBuf = new Uint8Array(0); // discard CLI echo
+  }
+
+  async close() {
+    this._stopped = true;
+    try { this.writer.releaseLock(); } catch {}
+    try { await this.port.close(); } catch {}
+  }
+
+  async _pkt() {
+    while (this.rxBuf.length < 4) await sleep(5);
+    const len = new DataView(this.rxBuf.buffer, this.rxBuf.byteOffset, 4).getUint32(0, true);
+    if (len > 4_000_000) throw new Error(`Unexpected RPC packet length ${len} — lost sync`);
+    while (this.rxBuf.length < 4 + len) await sleep(5);
+    const msg = parse_main(this.rxBuf.slice(4, 4+len));
+    this.rxBuf = this.rxBuf.slice(4+len);
+    return msg;
+  }
+
+  async _wait(id, allowStatus = new Set([0])) {
+    while (true) {
+      const r = await this._pkt();
+      if (r.cmd_id !== id) continue;
+      if (!allowStatus.has(r.cmd_status))
+        throw new Error(`RPC cmd ${id} failed with status ${r.cmd_status}`);
+      return r;
+    }
+  }
+
+  async mkdir(path) {
+    const [id, pkt] = mkdir_pkt(path);
+    await this.writer.write(pkt);
+    await this._wait(id, new Set([0, 6])); // 6 = already exists
+  }
+
+  async delete(path, recursive = false) {
+    const [id, pkt] = delete_pkt(path, recursive);
+    await this.writer.write(pkt);
+    await this._wait(id, new Set([0, 7])); // 7 = not found
+  }
+
+  async upload(path, data, onProgress) {
+    const [id, pkts] = write_pkts(path, data);
+    for (let i = 0; i < pkts.length; i++) {
+      await this.writer.write(pkts[i]);
+      await this._wait(id, new Set([0]));
+      onProgress?.((i+1) / pkts.length);
+    }
+  }
+
+  async trigger_update(manifest) {
+    const [id, pkt] = update_pkt(manifest);
+    await this.writer.write(pkt);
+    await this._wait(id, new Set([0]));
+  }
+}
+
+/* ── UI ───────────────────────────────────────────────────────────────────── */
+const $status = document.getElementById('status');
+const $prog   = document.getElementById('prog');
+const $wrap   = document.getElementById('progWrap');
+
+function setStatus(msg, cls='') {
+  $status.textContent = msg;
+  $status.className   = cls;
+}
+function setProgress(v) { $prog.value = Math.round(v * 100); }
+
+/* ── Flash flow ───────────────────────────────────────────────────────────── */
+async function doFlash() {
+  const btn = document.getElementById('flashBtn');
+  btn.disabled = true;
+  $wrap.style.display = 'block';
+  setProgress(0);
+  setStatus('');
+
+  let flipper;
+  try {
+    /* 1. Connect */
+    setStatus('Select your Flipper in the browser dialog…');
+    const port = await navigator.serial.requestPort({
+      filters: [{ usbVendorId: 0x0483, usbProductId: 0x5740 }]
+    });
+    await port.open({ baudRate: 230400 });
+    flipper = new Flipper(port);
+    setStatus('Starting RPC session…');
+    await flipper.open();
+    setProgress(0.03);
+
+    /* 2. Download bundle */
+    setStatus('Downloading firmware bundle…');
+    const resp = await fetch('latest-update.tgz');
+    if (!resp.ok) throw new Error(`Bundle download failed: ${resp.status}`);
+    const tgz = new Uint8Array(await resp.arrayBuffer());
+    setProgress(0.10);
+
+    /* 3. Decompress + untar */
+    setStatus('Decompressing…');
+    const tar_buf = pako.inflate(tgz);
+    const raw     = extract_tar(tar_buf);
+
+    // Strip leading directory component from names
+    const files = Object.entries(raw)
+      .filter(([k]) => !k.endsWith('/'))
+      .map(([k, v]) => ({ name: k.split('/').pop(), data: v }))
+      .filter(f => f.name);
+
+    const totalBytes = files.reduce((s, f) => s + f.data.length, 0);
+    setStatus(`Extracted ${files.length} files — ${(totalBytes/1024/1024).toFixed(1)} MB`);
+    setProgress(0.13);
+
+    /* 4. Prepare update directory */
+    await flipper.delete(UPDATE_DIR, true);
+    await flipper.mkdir('/ext/update');
+    await flipper.mkdir(UPDATE_DIR);
+    setProgress(0.15);
+
+    /* 5. Upload files (small files first, firmware.dfu last) */
+    const ORDER = ['update.fuf','splash.bin','updater.bin','resources.ths','firmware.dfu'];
+    files.sort((a,b) => {
+      const ai = ORDER.indexOf(a.name), bi = ORDER.indexOf(b.name);
+      return (ai<0?99:ai) - (bi<0?99:bi);
+    });
+
+    let uploadedBytes = 0;
+    for (const { name, data } of files) {
+      setStatus(`Uploading ${name} (${(data.length/1024).toFixed(0)} KB)…`);
+      await flipper.upload(`${UPDATE_DIR}/${name}`, data, pct => {
+        const done = uploadedBytes + pct * data.length;
+        setProgress(0.15 + 0.80 * done / totalBytes);
+      });
+      uploadedBytes += data.length;
+    }
+
+    setProgress(0.96);
+
+    /* 6. Trigger update */
+    setStatus('Triggering firmware update…');
+    await flipper.trigger_update(`${UPDATE_DIR}/update.fuf`);
+
+    setProgress(1.0);
+    setStatus('✓ Update started! Flipper is installing (~30 s). Do NOT unplug until it reboots.', 'ok');
+
+  } catch (e) {
+    setStatus(`Error: ${e.message}`, 'err');
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    if (flipper) await flipper.close();
+  }
+}
+
+/* ── Init ─────────────────────────────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', async () => {
+  const btn = document.getElementById('flashBtn');
+
+  if (!('serial' in navigator)) {
+    btn.disabled = true;
+    document.getElementById('versionBox').innerHTML =
+      '&#9888; WebSerial not supported.<br>Open this page in <b>Chrome</b> or <b>Edge</b>.';
+    return;
+  }
+
+  try {
+    const lines = (await fetch('latest-build.txt').then(r => r.text())).trim().split('\n');
+    // expected: SHORT_SHA, ARF_TAG, ISO date
+    document.getElementById('versionBox').innerHTML =
+      `<b>Version:</b> <span class="val">${lines[0]||'?'}</span> &nbsp;`+
+      `<b>ARF:</b> <span class="val">${lines[1]||'?'}</span><br>`+
+      `<b>Built:</b> ${lines[2]||lines[0]||'?'}`;
+  } catch {
+    document.getElementById('versionBox').textContent = 'Version info unavailable';
+  }
+
+  btn.addEventListener('click', doFlash);
+});
+</script>
+</body>
+</html>

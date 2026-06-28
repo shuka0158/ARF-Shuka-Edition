@@ -318,12 +318,16 @@ jobs:
             exit 0
           fi
           cp "$BUNDLE" shuka-edition/docs/latest-update.tgz
-          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > shuka-edition/docs/latest-build.txt
-          echo "${{ github.run_number }}" >> shuka-edition/docs/latest-build.txt
+          # latest-build.txt: SHORT_SHA, ARF_TAG, ISO timestamp (one per line)
+          printf '%s\n%s\n%s\n' \
+            "${{ env.SHORT_SHA }}" \
+            "${{ env.ARF_TAG }}" \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > shuka-edition/docs/latest-build.txt
           cd shuka-edition
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/latest-update.tgz docs/latest-build.txt
+          git add docs/latest-update.tgz docs/latest-build.txt docs/flash.html
           git commit -m "ci: publish OTA bundle ${{ env.SHORT_SHA }} [skip ci]" || echo "Nothing to commit"
           git push
 

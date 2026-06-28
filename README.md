@@ -106,6 +106,16 @@ RAW · BIN RAW
 
 ## Quick start
 
+### Web flasher (easiest — Chrome/Edge only)
+
+1. Open **[shuka0158.github.io/ARF-Shuka-Edition/flash.html](https://shuka0158.github.io/ARF-Shuka-Edition/flash.html)** in Chrome or Edge
+2. Plug in your Flipper via USB
+3. Click **Connect & Flash** — done
+
+The web flasher downloads the latest bundle and installs it over USB using the Flipper RPC protocol. No qFlipper or file downloads required. Firefox is not supported (no WebSerial).
+
+---
+
 ### Recommended — full install (firmware + apps)
 
 1. Go to [Releases](../../releases) and download **`flipper-z-f7-update-arf-shuka-edition.tgz`**
