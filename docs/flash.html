@@ -183,17 +183,39 @@ class Flipper {
         } catch { break; }
       }
     })();
-    // Send Ctrl+C to interrupt any ongoing CLI operation
+    // Ctrl+C to interrupt any active CLI operation, then flush
     await this.writer.write(new Uint8Array([0x03]));
-    await sleep(150);
-    this.rxBuf = new Uint8Array(0);
-    // Switch to RPC mode
-    await this.writer.write(te.encode('\r\nstart_rpc_session\r\n'));
-    // Wait long enough for all CLI echo + mode-switch bytes to arrive, then flush twice
-    await sleep(1000);
-    this.rxBuf = new Uint8Array(0);
     await sleep(200);
     this.rxBuf = new Uint8Array(0);
+    // Switch to RPC mode and wait for all CLI echo to arrive
+    await this.writer.write(te.encode('\r\nstart_rpc_session\r\n'));
+    await sleep(1000);
+    this.rxBuf = new Uint8Array(0);
+    await sleep(300);
+    this.rxBuf = new Uint8Array(0);
+    // Verify RPC is actually active with a ping
+    await this._ping();
+  }
+
+  // system_ping_request = field 5, PingRequest.data = field 1 (bytes)
+  async _ping() {
+    const id = newId();
+    const pkt = wrap_main(id, false, fb(5, fb(1, new Uint8Array([0xDE, 0xAD]))));
+    await this.writer.write(pkt);
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline) {
+      if (this.rxBuf.length >= 4) {
+        const len = new DataView(this.rxBuf.buffer, this.rxBuf.byteOffset, 4).getUint32(0, true);
+        if (len > 65535) { this.rxBuf = this.rxBuf.slice(1); continue; }
+        if (this.rxBuf.length >= 4 + len) {
+          const msg = parse_main(this.rxBuf.slice(4, 4+len));
+          this.rxBuf = this.rxBuf.slice(4+len);
+          if (msg.cmd_id === id) return; // got our ping response
+        }
+      }
+      await sleep(20);
+    }
+    throw new Error('Flipper did not respond to ping — make sure the Flipper is on the home screen (not in a running app) and try again.');
   }
 
   async close() {
@@ -202,16 +224,18 @@ class Flipper {
     try { await this.port.close(); } catch {}
   }
 
-  async _pkt() {
+  // Returns next RPC packet, with timeout. Skips bytes on framing errors.
+  async _pkt(timeoutMs = 15000) {
+    const deadline = Date.now() + timeoutMs;
     for (;;) {
-      while (this.rxBuf.length < 4) await sleep(5);
+      if (Date.now() > deadline) throw new Error('RPC timeout — Flipper stopped responding');
+      if (this.rxBuf.length < 4) { await sleep(5); continue; }
       const len = new DataView(this.rxBuf.buffer, this.rxBuf.byteOffset, 4).getUint32(0, true);
       if (len > 65535) {
-        // Out of sync (CLI echo / stale bytes) — skip one byte and rescan
-        this.rxBuf = this.rxBuf.slice(1);
+        this.rxBuf = this.rxBuf.slice(1); // skip bad byte, rescan
         continue;
       }
-      while (this.rxBuf.length < 4 + len) await sleep(5);
+      if (this.rxBuf.length < 4 + len) { await sleep(5); continue; }
       const msg = parse_main(this.rxBuf.slice(4, 4+len));
       this.rxBuf = this.rxBuf.slice(4+len);
       return msg;
@@ -223,7 +247,7 @@ class Flipper {
       const r = await this._pkt();
       if (r.cmd_id !== id) continue;
       if (!allowStatus.has(r.cmd_status))
-        throw new Error(`RPC cmd ${id} failed with status ${r.cmd_status}`);
+        throw new Error(`RPC error status ${r.cmd_status} (cmd ${id})`);
       return r;
     }
   }
@@ -284,8 +308,9 @@ async function doFlash() {
     });
     await port.open({ baudRate: 230400 });
     flipper = new Flipper(port);
-    setStatus('Starting RPC session…');
+    setStatus('Starting RPC session… (Flipper must be on home screen)');
     await flipper.open();
+    setStatus('RPC verified.');
     setProgress(0.03);
 
     /* 2. Download bundle */
