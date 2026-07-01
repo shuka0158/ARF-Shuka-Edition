@@ -107,6 +107,12 @@ jobs:
         run: |
           PROTO=flipper-fw/lib/subghz/protocols
 
+          # Remove 3rd-party system FAPs that use official-only HAL APIs not present in ARF SDK.
+          # ir_remote uses FuriHalInfraredTxPin / furi_hal_infrared_set_tx_output which ARF removed.
+          # The main-menu Infrared app (applications/main/infrared/) is unaffected.
+          rm -rf flipper-fw/applications/system/ir_remote
+          echo "Removed incompatible ir_remote system FAP"
+
           # Remove Russian aftermarket protocols — regional, rarely encountered outside RU.
           # Scher-Khan (37 KB src), Sheriff CFM (23 KB src), Star Line (42 KB src)
           # together account for ~4–6 KB of compiled flash.
