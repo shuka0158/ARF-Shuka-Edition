@@ -107,11 +107,18 @@ jobs:
         run: |
           PROTO=flipper-fw/lib/subghz/protocols
 
-          # Remove 3rd-party system FAPs that use official-only HAL APIs not present in ARF SDK.
-          # ir_remote uses FuriHalInfraredTxPin / furi_hal_infrared_set_tx_output which ARF removed.
-          # The main-menu Infrared app (applications/main/infrared/) is unaffected.
-          rm -rf flipper-fw/applications/system/ir_remote
-          echo "Removed incompatible ir_remote system FAP"
+          # Remove 3rd-party system FAPs that use official-only APIs absent in ARF's SDK.
+          # Grep for symbols ARF removed (InfraredSettings, FuriHalInfraredTxPin, etc.)
+          # and delete the whole FAP directory so fbt never tries to compile them.
+          BROKEN=$(grep -rl \
+            "InfraredSettings\|FuriHalInfraredTxPin\|furi_hal_infrared_set_tx_output\|INFRARED_SETTINGS_PATH\|furi_hal_infrared_detect_tx_output" \
+            flipper-fw/applications/system/ --include="*.c" --include="*.h" 2>/dev/null \
+            | sed "s|flipper-fw/applications/system/||" | cut -d/ -f1 | sort -u)
+          for app in $BROKEN; do
+            rm -rf "flipper-fw/applications/system/${app}"
+            echo "  removed incompatible system FAP: ${app}"
+          done
+          echo "System FAP cleanup done"
 
           # Remove Russian aftermarket protocols — regional, rarely encountered outside RU.
           # Scher-Khan (37 KB src), Sheriff CFM (23 KB src), Star Line (42 KB src)
