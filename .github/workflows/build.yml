@@ -117,7 +117,7 @@ jobs:
           PROTO=flipper-fw/lib/subghz/protocols
 
           # Remove 3rd-party system FAPs that use official-only APIs absent in ARF's SDK.
-          # Grep for symbols/headers that ARF removed and delete the FAP directory.
+          # 1) Grep-based: symbols/headers ARF removed (catches ir_remote, xremote, etc.)
           BROKEN=$(grep -rl \
             "InfraredSettings\|FuriHalInfraredTxPin\|furi_hal_infrared_set_tx_output\|INFRARED_SETTINGS_PATH\|furi_hal_infrared_detect_tx_output\|ibutton/ibutton_key\.h" \
             flipper-fw/applications/system/ --include="*.c" --include="*.h" 2>/dev/null \
@@ -125,6 +125,12 @@ jobs:
           for app in $BROKEN; do
             rm -rf "flipper-fw/applications/system/${app}"
             echo "  removed incompatible system FAP: ${app}"
+          done
+          # 2) Explicit removals: FAPs that pull in broken files from applications/main/
+          #    cli_ikey compiles ibutton_cli.c which needs ibutton_key.h not in ARF SDK
+          for app in cli_ikey; do
+            rm -rf "flipper-fw/applications/system/${app}" 2>/dev/null && \
+              echo "  removed incompatible system FAP: ${app}"
           done
           echo "System FAP cleanup done"
 
