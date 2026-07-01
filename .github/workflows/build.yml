@@ -126,11 +126,14 @@ jobs:
             rm -rf "flipper-fw/applications/system/${app}"
             echo "  removed incompatible system FAP: ${app}"
           done
-          # 2) Explicit removals: FAPs that pull in broken files from applications/main/
-          #    cli_ikey compiles ibutton_cli.c which needs ibutton_key.h not in ARF SDK
-          for app in cli_ikey; do
-            rm -rf "flipper-fw/applications/system/${app}" 2>/dev/null && \
-              echo "  removed incompatible system FAP: ${app}"
+          # 2) Find system FAPs that reference ibutton_cli (breaks because ibutton_key.h
+          #    is missing in ARF SDK). Search SConscript/fam/C files for the reference.
+          IKEY=$(grep -rl "ibutton_cli" flipper-fw/applications/system/ \
+            --include="*.c" --include="*.h" --include="SConscript" --include="*.fam" \
+            2>/dev/null | sed "s|flipper-fw/applications/system/||" | cut -d/ -f1 | sort -u)
+          for app in $IKEY; do
+            rm -rf "flipper-fw/applications/system/${app}"
+            echo "  removed ibutton_cli-dependent FAP: ${app}"
           done
           echo "System FAP cleanup done"
 
