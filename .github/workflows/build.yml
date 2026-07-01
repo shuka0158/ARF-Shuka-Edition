@@ -56,25 +56,34 @@ jobs:
 
       - name: Add missing apps from official Flipper firmware
         run: |
-          # ARF frequently strips core apps (infrared, ibutton, bad_usb, u2f).
-          # We always pull them from official firmware source to guarantee they compile.
+          # Only add apps that are truly absent from ARF — never overwrite ARF's own
+          # version, because system FAPs (like cli_ikey) may depend on ARF's API.
           CORE_APPS="applications/main/infrared applications/main/ibutton applications/main/bad_usb applications/main/u2f"
-          git clone --depth 1 --filter=blob:none --sparse \
-            https://github.com/flipperdevices/flipperzero-firmware.git flipper-official
-          cd flipper-official
-          git sparse-checkout set $CORE_APPS
-          cd ..
+          NEED=""
           for app in infrared ibutton bad_usb u2f; do
-            dest="flipper-fw/applications/main/${app}"
-            if [ -d "flipper-official/applications/main/${app}" ]; then
-              rm -rf "$dest"
-              cp -r "flipper-official/applications/main/${app}" "$dest"
-              echo "  added: ${app}"
+            if [ ! -d "flipper-fw/applications/main/${app}" ]; then
+              NEED="$NEED applications/main/${app}"
+              echo "  missing: ${app} — will add from official firmware"
             else
-              echo "  WARNING: ${app} not found in official firmware"
+              echo "  present: ${app} — keeping ARF's version"
             fi
           done
-          rm -rf flipper-official
+          if [ -n "$NEED" ]; then
+            git clone --depth 1 --filter=blob:none --sparse \
+              https://github.com/flipperdevices/flipperzero-firmware.git flipper-official
+            cd flipper-official
+            git sparse-checkout set $NEED
+            cd ..
+            for app in infrared ibutton bad_usb u2f; do
+              dest="flipper-fw/applications/main/${app}"
+              src="flipper-official/applications/main/${app}"
+              if [ ! -d "$dest" ] && [ -d "$src" ]; then
+                cp -r "$src" "$dest"
+                echo "  added: ${app}"
+              fi
+            done
+            rm -rf flipper-official
+          fi
           echo "Core apps patched OK"
 
       - name: Apply Shuka-Edition modified files
@@ -108,10 +117,9 @@ jobs:
           PROTO=flipper-fw/lib/subghz/protocols
 
           # Remove 3rd-party system FAPs that use official-only APIs absent in ARF's SDK.
-          # Grep for symbols ARF removed (InfraredSettings, FuriHalInfraredTxPin, etc.)
-          # and delete the whole FAP directory so fbt never tries to compile them.
+          # Grep for symbols/headers that ARF removed and delete the FAP directory.
           BROKEN=$(grep -rl \
-            "InfraredSettings\|FuriHalInfraredTxPin\|furi_hal_infrared_set_tx_output\|INFRARED_SETTINGS_PATH\|furi_hal_infrared_detect_tx_output" \
+            "InfraredSettings\|FuriHalInfraredTxPin\|furi_hal_infrared_set_tx_output\|INFRARED_SETTINGS_PATH\|furi_hal_infrared_detect_tx_output\|ibutton/ibutton_key\.h" \
             flipper-fw/applications/system/ --include="*.c" --include="*.h" 2>/dev/null \
             | sed "s|flipper-fw/applications/system/||" | cut -d/ -f1 | sort -u)
           for app in $BROKEN; do
