@@ -7,8 +7,11 @@
 - Nissan/Infiniti RKE protocol (315/433 MHz, PWM, 64-bit Keeloq-derived rolling code)
 - Renault/Dacia RKE protocol (433 MHz, PCM, 64-bit rolling code)
 - GM/Chevrolet rolling-code protocol (315 MHz, Manchester, 64-bit frame with 5-button support)
+- Honda/Acura RKE protocol (315/433 MHz, PWM, 64-bit frame, CRC-8 poly 0x2F)
+- Hyundai New / Genesis RKE protocol (433 MHz, PWM, 64-bit frame, CRC-8 poly 0x31)
 - Automotive passive scanner (`scan_automotive.c`) — scans known automotive frequencies and reports matching protocol
 - GitHub Actions CI/CD: auto-builds firmware on push, creates releases on `v*` tags
+- CI `test` job compiles and runs the `tests/` crypto vectors and gates the firmware build on them
 - `scripts/check_size.sh` — fails CI if `.dfu` exceeds the 880 KB radio flash limit
 - `.gitignore` for build artifacts, toolchain cache, and editor files
 - `docs/protocol_reference.md` — frequency, bit count, encoding, and frame layout for every protocol
@@ -22,6 +25,10 @@
 - **Ford V0 display**: CRC and checksum merged to one line; rolling-counter displayed as decimal alongside hex
 - **Boot screen**: custom pixel-art car icon replaces plain text, credits remain below
 - Protocol sections in `protocol_items.c` sorted alphabetically within the automotive group
+
+### Fixed
+- `tests/test_aut64.c` no longer used a non-existent 3-argument `aut64_encrypt`/`aut64_decrypt`/`aut64_pack` API — rewritten against the real in-place API so it compiles and passes (5/5)
+- `tests/test_keeloq.c` KeeLoq NLFSR used the wrong linear feedback taps (bit 31 instead of bit 16 on encrypt; bit 0 instead of bit 15 on decrypt), so encrypt/decrypt were not inverses — corrected to canonical KeeLoq and verified against an independent known-answer vector (10/10)
 
 ---
 

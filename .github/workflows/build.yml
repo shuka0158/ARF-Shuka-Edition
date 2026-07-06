@@ -17,8 +17,26 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  test:
+    name: Crypto unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile & run crypto test vectors
+        run: |
+          cd tests
+          echo "== AUT64 block cipher =="
+          gcc -I.. -O2 -Wall -Werror -o test_aut64 test_aut64.c ../new_files/aut64.c
+          ./test_aut64
+          echo "== KeeLoq rolling code =="
+          gcc -I.. -O2 -Wall -Werror -o test_keeloq test_keeloq.c
+          ./test_keeloq
+
   build:
     runs-on: ubuntu-latest
+    needs: test
     permissions:
       contents: write
 

@@ -34,7 +34,7 @@ static uint32_t keeloq_encrypt_block(uint32_t data, uint64_t key) {
              (((data >> 20) & 1) << 2) |
              (((data >> 26) & 1) << 3) |
              (((data >> 31) & 1) << 4))) & 1);
-        uint32_t feedback = (data >> 31) ^ (data >> 0) ^ nlf ^ keybit;
+        uint32_t feedback = (data >> 16) ^ (data >> 0) ^ nlf ^ keybit;
         data = (data >> 1) | ((feedback & 1) << 31);
     }
     return data;
@@ -49,7 +49,7 @@ static uint32_t keeloq_decrypt_block(uint32_t data, uint64_t key) {
              (((data >> 19) & 1) << 2) |
              (((data >> 25) & 1) << 3) |
              (((data >> 30) & 1) << 4))) & 1);
-        uint32_t feedback = (data >> 0) ^ (data >> 31) ^ nlf ^ keybit;
+        uint32_t feedback = (data >> 15) ^ (data >> 31) ^ nlf ^ keybit;
         data = (data << 1) | ((feedback & 1));
         data &= 0xFFFFFFFF;
     }
@@ -76,10 +76,24 @@ static bool check_u32(const char* name, uint32_t got, uint32_t expected) {
 /* ─── Test vectors ─────────────────────────────────────────────────────────── */
 
 /*
- * Vector 1: Microchip AN66806 reference vector
- * Key:  0x0000000000000000 (all-zero, trivial)
- * PT:   0x00000000
- * CT:   known output of the NLFSR on zero inputs
+ * Vector 0: Known-answer test against an independent KeeLoq reference.
+ * Key: 0x5CEC6701B79FD949  PT: 0xF741E2DB  CT: 0xE44F4CDF
+ * (Widely-published KeeLoq test vector; confirms this is canonical KeeLoq
+ * and not merely a self-consistent encrypt/decrypt pair.)
+ */
+static void test_keeloq_kat(void) {
+    uint64_t key = 0x5CEC6701B79FD949ULL;
+    uint32_t pt  = 0xF741E2DBUL;
+    uint32_t ct  = keeloq_encrypt_block(pt, key);
+    check_u32("KAT: encrypt matches reference ciphertext", ct, 0xE44F4CDFUL);
+    check_u32("KAT: decrypt(reference ct) == pt", keeloq_decrypt_block(0xE44F4CDFUL, key), pt);
+}
+
+/*
+ * Vector 1: zero key, zero plaintext.
+ * All-zero is a genuine fixed point of KeeLoq — with a zero key the feedback
+ * bit is zero every round, so the ciphertext is also zero. (An earlier version
+ * of this test wrongly asserted a non-zero ciphertext here.)
  */
 static void test_keeloq_zero(void) {
     uint64_t key = 0x0000000000000000ULL;
@@ -87,17 +101,8 @@ static void test_keeloq_zero(void) {
     uint32_t ct  = keeloq_encrypt_block(pt, key);
     uint32_t dt  = keeloq_decrypt_block(ct, key);
 
-    /* Round-trip must return original */
     check_u32("ZeroKey: decrypt(encrypt(0)) == 0", dt, pt);
-
-    /* CT must be non-trivial (NLFSR activates even on zero) */
-    tests_run++;
-    if(ct != 0) {
-        tests_passed++;
-        printf("  PASS  ZeroKey: ciphertext is non-zero\n");
-    } else {
-        printf("  FAIL  ZeroKey: ciphertext is zero (degenerate NLFSR)\n");
-    }
+    check_u32("ZeroKey: zero is a fixed point (ct == 0)", ct, 0x00000000UL);
 }
 
 /*
@@ -180,6 +185,7 @@ static void test_keeloq_nissan_button_map(void) {
 int main(void) {
     printf("=== Keeloq rolling-code tests ===\n\n");
 
+    test_keeloq_kat();
     test_keeloq_zero();
     test_keeloq_roundtrip_1();
     test_keeloq_roundtrip_2();

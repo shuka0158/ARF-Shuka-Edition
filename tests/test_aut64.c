@@ -72,43 +72,50 @@ static void test_aut64_vector1(void) {
     uint8_t ciphertext[AUT64_BLOCK_SIZE] = {0};
     uint8_t decrypted[AUT64_BLOCK_SIZE]  = {0};
 
-    aut64_encrypt(ciphertext, plaintext, &key);
-    aut64_decrypt(decrypted, ciphertext, &key);
+    memcpy(ciphertext, plaintext, AUT64_BLOCK_SIZE);
+    aut64_encrypt(key, ciphertext);
+    memcpy(decrypted, ciphertext, AUT64_BLOCK_SIZE);
+    aut64_decrypt(key, decrypted);
 
     /* Encrypt→Decrypt must return original plaintext */
     check_bytes("Vector1: decrypt(encrypt(pt)) == pt", decrypted, plaintext, AUT64_BLOCK_SIZE);
 }
 
 /*
- * Vector 2 — all-zero key, all-zero plaintext
- * Confirms the cipher activates even on zero inputs (non-trivial output).
+ * Vector 2 — the cipher must actually transform its input.
+ * Encrypting a non-zero block under a real key must change it (ct != pt) and
+ * the round-trip must recover it. Note: an all-zero block is a *structural*
+ * fixed point of AUT64 whenever sbox[0] == 0 (column 0 of the offset table is
+ * all-zero and the compression of a zero state is zero), so a zero plaintext is
+ * not a useful non-degeneracy probe — an earlier version of this test used one.
  */
-static void test_aut64_zero_input(void) {
-    static const uint8_t packed_key[AUT64_KEY_STRUCT_PACKED_SIZE] = {0};
+static void test_aut64_transform(void) {
+    static const uint8_t packed_key[AUT64_KEY_STRUCT_PACKED_SIZE] = {
+        0x01, 0x37, 0x6C, 0x86, 0xAD, 0xAB, 0xCC, 0x43,
+        0x07, 0x4D, 0xE8, 0x59, 0xC1, 0x2F, 0x36, 0xAB
+    };
     struct aut64_key key;
     aut64_unpack(&key, packed_key);
 
-    uint8_t pt[AUT64_BLOCK_SIZE] = {0};
-    uint8_t ct[AUT64_BLOCK_SIZE] = {0};
-    uint8_t dt[AUT64_BLOCK_SIZE] = {0};
+    uint8_t pt[AUT64_BLOCK_SIZE] = {0x10, 0x00, 0x04, 0x00, 0xA5, 0x3B, 0xC2, 0x1F};
+    uint8_t ct[AUT64_BLOCK_SIZE];
+    uint8_t dt[AUT64_BLOCK_SIZE];
 
-    aut64_encrypt(ct, pt, &key);
+    memcpy(ct, pt, AUT64_BLOCK_SIZE);
+    aut64_encrypt(key, ct);
 
-    /* The output must NOT be all-zero (cipher should be non-degenerate) */
-    bool non_zero = false;
-    for(int i = 0; i < AUT64_BLOCK_SIZE; i++) {
-        if(ct[i] != 0) { non_zero = true; break; }
-    }
+    /* The cipher must not be a no-op */
     tests_run++;
-    if(non_zero) {
+    if(memcmp(ct, pt, AUT64_BLOCK_SIZE) != 0) {
         tests_passed++;
-        printf("  PASS  ZeroInput: ciphertext is non-zero\n");
+        printf("  PASS  Transform: ciphertext differs from plaintext\n");
     } else {
-        printf("  FAIL  ZeroInput: ciphertext is all-zero (degenerate)\n");
+        printf("  FAIL  Transform: ciphertext equals plaintext (cipher is a no-op)\n");
     }
 
-    aut64_decrypt(dt, ct, &key);
-    check_bytes("ZeroInput: decrypt(encrypt(0)) == 0", dt, pt, AUT64_BLOCK_SIZE);
+    memcpy(dt, ct, AUT64_BLOCK_SIZE);
+    aut64_decrypt(key, dt);
+    check_bytes("Transform: decrypt(encrypt(pt)) == pt", dt, pt, AUT64_BLOCK_SIZE);
 }
 
 /*
@@ -125,7 +132,7 @@ static void test_aut64_pack_roundtrip(void) {
     aut64_unpack(&key, original);
 
     uint8_t repacked[AUT64_KEY_STRUCT_PACKED_SIZE] = {0};
-    aut64_pack(repacked, &key);
+    aut64_pack(repacked, key);
 
     check_bytes("PackRoundtrip: pack(unpack(bytes)) == bytes", repacked, original, AUT64_KEY_STRUCT_PACKED_SIZE);
 }
@@ -146,8 +153,10 @@ static void test_aut64_known_ct(void) {
     uint8_t ct[AUT64_BLOCK_SIZE] = {0};
     uint8_t dt[AUT64_BLOCK_SIZE] = {0};
 
-    aut64_encrypt(ct, pt, &key);
-    aut64_decrypt(dt, ct, &key);
+    memcpy(ct, pt, AUT64_BLOCK_SIZE);
+    aut64_encrypt(key, ct);
+    memcpy(dt, ct, AUT64_BLOCK_SIZE);
+    aut64_decrypt(key, dt);
 
     check_bytes("KnownCT: decrypt(encrypt(pt)) == pt", dt, pt, AUT64_BLOCK_SIZE);
 }
@@ -158,7 +167,7 @@ int main(void) {
     printf("=== AUT64 block cipher tests ===\n\n");
 
     test_aut64_vector1();
-    test_aut64_zero_input();
+    test_aut64_transform();
     test_aut64_pack_roundtrip();
     test_aut64_known_ct();
 
