@@ -302,6 +302,16 @@ function setStatus(msg, cls='') {
 function setProgress(v) { $prog.value = Math.round(v * 100); }
 
 /* ── Flash flow ───────────────────────────────────────────────────────────── */
+// Pre-fetch bundle in background as soon as page loads so it's ready when user connects
+let _bundlePromise = null;
+function prefetchBundle() {
+  if (_bundlePromise) return;
+  _bundlePromise = fetch('latest-update.tgz').then(r => {
+    if (!r.ok) throw new Error(`Bundle download failed: ${r.status}`);
+    return r.arrayBuffer();
+  }).then(ab => new Uint8Array(ab));
+}
+
 async function doFlash() {
   const btn = document.getElementById('flashBtn');
   btn.disabled = true;
@@ -312,10 +322,18 @@ async function doFlash() {
   let flipper;
   try {
     /* 1. Connect */
-    setStatus('Select your Flipper in the browser dialog…');
-    const port = await navigator.serial.requestPort({
-      filters: [{ usbVendorId: 0x0483, usbProductId: 0x5740 }]
-    });
+    setStatus('Select your Flipper in the port picker…');
+    let port;
+    try {
+      port = await navigator.serial.requestPort({
+        filters: [{ usbVendorId: 0x0483, usbProductId: 0x5740 }]
+      });
+    } catch (e) {
+      // User cancelled the picker — not an error, just re-enable the button
+      setStatus('No port selected. Plug in your Flipper and click Flash again.');
+      btn.disabled = false;
+      return;
+    }
     await port.open({ baudRate: 230400 });
     flipper = new Flipper(port);
     setStatus('Starting RPC session… (Flipper must be on home screen)');
@@ -323,11 +341,10 @@ async function doFlash() {
     setStatus('RPC verified ✓');
     setProgress(0.03);
 
-    /* 2. Download bundle */
-    setStatus('Downloading firmware bundle…');
-    const resp = await fetch('latest-update.tgz');
-    if (!resp.ok) throw new Error(`Bundle download failed: ${resp.status}`);
-    const tgz = new Uint8Array(await resp.arrayBuffer());
+    /* 2. Download bundle (may already be cached from prefetch) */
+    setStatus('Loading firmware bundle…');
+    prefetchBundle(); // no-op if already started
+    const tgz = await _bundlePromise;
     setProgress(0.10);
 
     /* 3. Decompress + untar */
@@ -409,6 +426,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   btn.addEventListener('click', doFlash);
+  prefetchBundle(); // start downloading in background immediately
 });
 </script>
 </body>
