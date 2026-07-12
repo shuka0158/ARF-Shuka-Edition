@@ -50,7 +50,7 @@ progress::-webkit-progress-value{background:#ff8c00;border-radius:3px;transition
     Requires <a href="https://caniuse.com/web-serial" target="_blank">WebSerial</a> (Chrome&nbsp;89+, Edge&nbsp;89+).
     Firefox is not supported.<br>
     Flipper must be on the <b>home screen</b> before clicking Flash.
-    Do not unplug during install (~30&nbsp;s after trigger).
+    Upload takes ~30&nbsp;s, then Flipper installs automatically. Do not unplug.
   </p>
 </main>
 
@@ -61,7 +61,7 @@ progress::-webkit-progress-value{background:#ff8c00;border-radius:3px;transition
 
 // ── CONFIG ───────────────────────────────────────────────────────
 const TGZ_URL = 'latest-update.tgz';
-const CHUNK   = 512;
+const CHUNK   = 4096; // 4 KB chunks — same reliability, 8× faster than 512 B
 const VID     = 0x0483;
 
 // ── PROTOBUF SCHEMA (FoxFW v56 — field numbers verified against real proto source) ──
@@ -238,6 +238,7 @@ async function rpcMkdir(path) {
 }
 async function rpcWriteFile(path, data, onProgress) {
   const id = cmdId++;
+  const totalKB = (data.length / 1024).toFixed(0);
   for (let i = 0; i < data.length; i += CHUNK) {
     const chunk   = data.slice(i, i + CHUNK);
     const hasNext = (i + CHUNK) < data.length;
@@ -246,12 +247,12 @@ async function rpcWriteFile(path, data, onProgress) {
       storageWriteRequest: { path, file: { data: chunk } } // path on every chunk
     }));
     await sleep(7); // flat inter-chunk gap (matches lab.flipper.net)
-    if (onProgress) onProgress(Math.min(i + CHUNK, data.length) / data.length);
-    const pct = Math.round(Math.min(i + CHUNK, data.length) / data.length * 100);
-    if (pct !== Math.round(i / data.length * 100)) logProgress('Uploading: ' + pct + '%');
+    const sent = Math.min(i + CHUNK, data.length);
+    const sentKB = (sent / 1024).toFixed(0);
+    if (onProgress) onProgress(sent / data.length, sentKB, totalKB);
     if (!hasNext) {
-      const waitMs = Math.min(30000, Math.max(5000, Math.ceil(data.length / 50000) * 1000));
-      setStatus('Writing to SD card…');
+      const waitMs = Math.min(60000, Math.max(5000, Math.ceil(data.length / 50000) * 1000));
+      setStatus('SD card write in progress…');
       const resp = await readResp(waitMs, id);
       if (resp && resp.commandStatus && resp.commandStatus !== 0)
         throw new Error('Write failed for ' + path + ': error code ' + resp.commandStatus);
@@ -319,12 +320,24 @@ async function doFlash() {
     setProgress(0.28);
 
     // 5. Decompress + parse
+    // pako.inflate on a 12 MB bundle blocks the JS event loop for several seconds.
+    // Yield first so the pump drains any buffered serial bytes, then inflate.
     setStatus('Decompressing…');
+    await sleep(50);
     const tar   = pako.inflate(tgz);
     const files = parseTar(tar);
     if (!files.length) throw new Error('No files in firmware package');
-    logLine('Found ' + files.length + ' files', 'ok');
+    logLine('Found ' + files.length + ' files in bundle', 'ok');
     setProgress(0.32);
+
+    // Re-ping after the synchronous decompression to confirm the RPC link
+    // is still alive (the event-loop freeze can leave the serial link stale).
+    await sleep(100);
+    const ping2Id = cmdId++;
+    await serialWriter.write(encodeMain({ commandId:ping2Id, systemPingRequest:{} }));
+    const pong2 = await readResp(6000, ping2Id);
+    if (!pong2) throw new Error('Connection lost during decompression — reboot Flipper and try again.');
+    logLine('Connection verified after decompression ✓', 'ok');
 
     const topDir     = files[0].name.split('/')[0];
     const sdBase     = '/ext/update/' + topDir;
@@ -343,11 +356,12 @@ async function doFlash() {
     let uploadedBytes = 0;
     for (let fi = 0; fi < files.length; fi++) {
       const f = files[fi];
-      setStatus('Uploading ' + f.name + ' (' + (f.data.length/1024).toFixed(0) + ' KB)…');
-      logLine('Uploading ' + f.name + '…', 'in');
-      await rpcWriteFile('/ext/update/' + f.name, f.data, p => {
+      const fKB = (f.data.length/1024).toFixed(0);
+      logLine('Uploading ' + f.name + ' (' + fKB + ' KB)…', 'in');
+      await rpcWriteFile('/ext/update/' + f.name, f.data, (p, sentKB, totalKB) => {
         const done = uploadedBytes + p * f.data.length;
         setProgress(0.35 + 0.57 * done / totalBytes);
+        setStatus(f.name + ': ' + sentKB + ' / ' + totalKB + ' KB');
       });
       uploadedBytes += f.data.length;
       logLine('✓ ' + f.name, 'ok');
