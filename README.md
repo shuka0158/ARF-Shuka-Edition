@@ -29,7 +29,7 @@ Custom Flipper Zero firmware by **shuka0158**, built on top of [D4C1-Labs/Flippe
 
 ## What this adds beyond ARF
 
-ARF-Shuka-Edition is identical to upstream ARF plus **6 automotive protocols** that ARF does not have:
+ARF-Shuka-Edition is identical to upstream ARF plus **6 automotive protocols** and the **X10 home automation protocol** that ARF does not have:
 
 | Protocol | Brand coverage | Encoding | Frame |
 |---|---|---|---|
@@ -44,6 +44,8 @@ ARF-Shuka-Edition is identical to upstream ARF plus **6 automotive protocols** t
 > Our `toyota_lexus.c` covers a different, newer frame format — both coexist in this firmware.
 >
 > Older Hyundai models (pre-2017) are already covered by the KIA V0–V7 variants already in ARF.
+
+**X10** (310 MHz AM, decode-only) is also added — the home automation protocol used by X10 switches and dimmers, not present in upstream ARF.
 
 Everything else — all 64 ARF protocols, the automotive scanner, car-key emulator, custom button support, Keeloq extensions, AES/AUT64/TEA crypto — is unchanged from ARF upstream.
 
@@ -69,7 +71,7 @@ A GitHub Actions bot checks for new ARF releases every 6 hours. When a new build
 
 ---
 
-## Full protocol list (67 total)
+## Full protocol list (68 total)
 
 ### Automotive RKE (our 6 additions marked ★)
 
@@ -98,6 +100,10 @@ A GitHub Actions bot checks for new ARF releases every 6 hours. When a new build
 
 Alutech AT-4N · Beninca Arc · CAME · CAME Atomo · CAME Twee · Chamberlain · Dickert MAHS · Doitrand · FAAC SLH · Gangqi · Gate TX · Hay21 · Holtek · Holtek HT12X · Hormann · Keyfinder · KingGates Stylo 4K · Linear · Linear Delta 3 · Marantec · Marantec24 · Mastercode · Megacode · Nice Flo · Nice Flor-S · Phoenix V2 · Princeton · Revers RB2 · Roger · Security+ V1 · Security+ V2 · SMC5326 · Somfy Keytis · Somfy Telis · Keeloq (generic)
 
+### Home Automation (added by Shuka-Edition ★)
+
+★ **X10** — 310 MHz AM, 32-bit decode (channel + button + on/off/dim/bright)
+
 ### Utility
 
 RAW · BIN RAW
@@ -109,10 +115,12 @@ RAW · BIN RAW
 ### Web flasher (easiest — Chrome/Edge only)
 
 1. Open **[shuka0158.github.io/ARF-Shuka-Edition/flash.html](https://shuka0158.github.io/ARF-Shuka-Edition/flash.html)** in Chrome or Edge
-2. Plug in your Flipper via USB
-3. Click **Connect & Flash** — done
+2. Plug in your Flipper via USB (Flipper must be on the HOME SCREEN)
+3. Click **Connect** → **⚡ Install Firmware** — done
 
-The web flasher downloads the latest bundle and installs it over USB using the Flipper RPC protocol. No qFlipper or file downloads required. Firefox is not supported (no WebSerial).
+The web flasher downloads the latest build automatically and installs it via USB RPC. No qFlipper, no file downloads, no SD card required. Firefox is not supported (no WebSerial).
+
+**DFU Recovery mode** is also available in the flasher for bricked Flippers — boot into DFU (hold Left + Back while powering on), download the `.dfu` from Releases, then use "Install from File".
 
 ---
 

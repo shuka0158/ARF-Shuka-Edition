@@ -200,6 +200,16 @@ jobs:
           cp $SHUKA/new_files/hyundai_new.c  $PROTO/
           cp $SHUKA/new_files/hyundai_new.h  $PROTO/
 
+          # X10 home automation protocol (310 MHz AM, 32-bit with inverted byte validation)
+          # Only add if not already present in ARF
+          if ! grep -q '#include "x10.h"' $PROTO/protocol_items.h 2>/dev/null; then
+            cp $SHUKA/new_files/x10.c $PROTO/
+            cp $SHUKA/new_files/x10.h $PROTO/
+            echo "  x10 protocol will be registered"
+          else
+            echo "  x10 already in ARF — skipping copy"
+          fi
+
           # ── Patch protocol_items.h — add our includes after toyota.h ─────
           if ! grep -q '#include "toyota.h"' $PROTO/protocol_items.h; then
             echo "ERROR: toyota.h include not found in protocol_items.h — ARF changed its layout" >&2
@@ -209,6 +219,11 @@ jobs:
             's|#include "toyota.h"|#include "toyota.h"\n#include "gm_rolling.h"\n#include "nissan.h"\n#include "renault.h"\n#include "toyota_lexus.h"\n#include "honda_acura.h"\n#include "hyundai_new.h"|' \
             $PROTO/protocol_items.h
           grep -q '#include "gm_rolling.h"' $PROTO/protocol_items.h || { echo "ERROR: header patch failed" >&2; exit 1; }
+          # Add x10 include if not already present
+          if [ -f "$PROTO/x10.h" ] && ! grep -q '#include "x10.h"' $PROTO/protocol_items.h; then
+            sed -i 's|#include "hyundai_new.h"|#include "hyundai_new.h"\n#include "x10.h"|' $PROTO/protocol_items.h
+            echo "  x10 include added"
+          fi
 
           # ── Patch protocol_items.c — add entries after &subghz_protocol_toyota ─
           if ! grep -q 'subghz_protocol_toyota,$' $PROTO/protocol_items.c; then
@@ -218,6 +233,11 @@ jobs:
           sed -i '/subghz_protocol_toyota,$/a\    \&subghz_protocol_toyota_lexus,\n    \&subghz_protocol_gm_rolling,\n    \&subghz_protocol_nissan,\n    \&subghz_protocol_renault,\n    \&subghz_protocol_honda_acura,\n    \&subghz_protocol_hyundai_new,' \
             $PROTO/protocol_items.c
           grep -q 'subghz_protocol_gm_rolling' $PROTO/protocol_items.c || { echo "ERROR: protocol_items.c patch failed" >&2; exit 1; }
+          # Add x10 entry if not already present
+          if [ -f "$PROTO/x10.c" ] && ! grep -q 'subghz_protocol_x10,' $PROTO/protocol_items.c; then
+            sed -i '/subghz_protocol_hyundai_new,$/a\    \&subghz_protocol_x10,' $PROTO/protocol_items.c
+            echo "  x10 protocol registered"
+          fi
 
           echo "All Shuka-Edition protocols added OK"
 
