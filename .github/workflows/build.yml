@@ -168,6 +168,36 @@ jobs:
             echo "Stripped: $proto"
           done
 
+          # Re-enable standard SubGHz protocols needed by the SubGHz Bruteforcer app.
+          # ARF comments these out by default (it focuses on automotive RKE), but the
+          # bruteforcer looks them up by name at runtime — if missing, furi_crash fires.
+          python3 - <<'PYEOF'
+import re, sys
+path = "flipper-fw/lib/subghz/protocols/protocol_items.c"
+needed = {
+    "gate_tx", "came", "nice_flo", "princeton", "linear", "linear_delta3",
+    "holtek", "chamb_code", "bett", "doitrand", "magellan",
+    "intertechno_v3", "clemsa", "ansonic", "smc5326",
+}
+with open(path) as f:
+    src = f.read()
+count = 0
+for proto in sorted(needed):
+    # Pattern: leading whitespace + // + & + protocol_name + ,
+    old = rf'(\s+)//(&subghz_protocol_{proto},)'
+    new = rf'\1\2'
+    result, n = re.subn(old, new, src)
+    if n:
+        src = result
+        count += 1
+        print(f"  uncommented: {proto}")
+    else:
+        print(f"  WARNING: {proto} not found commented-out in registry", file=sys.stderr)
+with open(path, "w") as f:
+    f.write(src)
+print(f"Re-enabled {count}/{len(needed)} standard protocols for bruteforcer")
+PYEOF
+
       - name: Add Shuka-Edition protocols on top of ARF
         run: |
           REPO=flipper-fw

@@ -92,7 +92,7 @@ const SubGhzProtocol subghz_protocol_x10 = {
     .flag = SubGhzProtocolFlag_315 /* Technically it is 310MHz only */ | SubGhzProtocolFlag_AM |
             SubGhzProtocolFlag_Decodable,
     .decoder = &subghz_protocol_x10_decoder,
-    .encoder = &subghz_protocol_x10_encoder,
+    .encoder = NULL, // decode-only; encoder stub has NULL alloc and would crash transmit path
 };
 
 void* subghz_protocol_decoder_x10_alloc(SubGhzEnvironment* environment) {
