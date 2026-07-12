@@ -9,7 +9,8 @@
 #define DESKTOP_SETTINGS_VER_17 (17)
 #define DESKTOP_SETTINGS_VER_18 (18)
 #define DESKTOP_SETTINGS_VER_19 (19)
-#define DESKTOP_SETTINGS_VER    (20)
+#define DESKTOP_SETTINGS_VER_20 (20)
+#define DESKTOP_SETTINGS_VER    (21)
 
 #define DESKTOP_SETTINGS_PATH  INT_PATH(DESKTOP_SETTINGS_FILE_NAME)
 #define DESKTOP_SETTINGS_MAGIC (0x17)
@@ -55,6 +56,19 @@ void desktop_settings_load(DesktopSettings* settings) {
                 sizeof(DesktopSettings),
                 DESKTOP_SETTINGS_MAGIC,
                 DESKTOP_SETTINGS_VER);
+
+        } else if(version == DESKTOP_SETTINGS_VER_20) {
+            // V20 → V21: struct identical; only change is menu_layout default changed to grid.
+            // Load everything from V20 and force menu_layout to the new default.
+            success = saved_struct_load(
+                DESKTOP_SETTINGS_PATH,
+                settings,
+                sizeof(DesktopSettings),
+                DESKTOP_SETTINGS_MAGIC,
+                DESKTOP_SETTINGS_VER_20);
+            if(success) {
+                settings->menu_layout = MENU_LAYOUT_DEFAULT;
+            }
 
         } else if(version == DESKTOP_SETTINGS_VER_19) {
             // V19 = same as current minus passport_char — migrate with defaults

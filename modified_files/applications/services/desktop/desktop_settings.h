@@ -11,7 +11,7 @@
 
 #define MENU_SCROLL_LOOP_DEFAULT 1 // warp (current behaviour)
 #define MENU_SCROLL_ANIM_DEFAULT 0 // instant
-#define MENU_LAYOUT_DEFAULT      0 // list
+#define MENU_LAYOUT_DEFAULT      1 // grid
 
 // Passport character: 0=dolphin, 1=skull, 2=hacker, 3=robot
 #define PASSPORT_CHAR_DEFAULT 0
