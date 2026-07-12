@@ -359,14 +359,14 @@ jobs:
             echo "Generated update.fuf:"
             cat "$UPDATE_DIR/update.fuf"
 
-            # Slim down resources.ths to only core FAPs so qFlipper's MD5
-            # check finishes in time. Users' existing SD card apps are untouched
-            # (Flipper updater only overwrites files present in resources.ths).
+            # Include full resources.ths (all FAPs + dolphin animations).
+            # slim_resources.py was originally added to work around qFlipper's
+            # MD5 timeout, but our web flasher has no such limit. Including all
+            # FAPs ensures the OTA deploys the complete app catalog without
+            # wiping apps like proto_pirate, protoview, subghz_bruteforcer, etc.
             RESOURCES_THS="$UPDATE_DIR/resources.ths"
             if [ -f "$RESOURCES_THS" ]; then
-              pip3 install -q heatshrink2
-              python3 shuka-edition/scripts/slim_resources.py "$RESOURCES_THS"
-              echo "resources.ths slimmed OK"
+              echo "resources.ths: $(du -sh "$RESOURCES_THS" | cut -f1) (full, not slimmed)"
             fi
 
             BUNDLE_NAME="flipper-z-f7-update-arf-shuka-edition.tgz"
