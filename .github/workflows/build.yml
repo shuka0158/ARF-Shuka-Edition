@@ -400,6 +400,12 @@ jobs:
             exit 0
           fi
           cp "$BUNDLE" shuka-edition/docs/latest-update.tgz
+          # Also publish the full DFU for the web flasher DFU recovery mode
+          DFU_FULL=$(find artifacts -name "flipper-z-f7-full-*.dfu" | head -1)
+          if [ -n "$DFU_FULL" ]; then
+            cp "$DFU_FULL" shuka-edition/docs/latest-full.dfu
+            echo "DFU published to docs/latest-full.dfu ($(du -sh shuka-edition/docs/latest-full.dfu | cut -f1))"
+          fi
           # latest-build.txt: SHORT_SHA, ARF_TAG, ISO timestamp (one per line)
           printf '%s\n%s\n%s\n' \
             "${{ env.SHORT_SHA }}" \
@@ -409,7 +415,7 @@ jobs:
           cd shuka-edition
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/latest-update.tgz docs/latest-build.txt docs/flash.html
+          git add docs/latest-update.tgz docs/latest-build.txt docs/flash.html docs/latest-full.dfu 2>/dev/null || true
           git commit -m "ci: publish OTA bundle ${{ env.SHORT_SHA }} [skip ci]" || echo "Nothing to commit"
           git push
 
