@@ -366,6 +366,8 @@ jobs:
               echo "Target: 7"
               [ -n "$LOADER_LINE" ] && echo "$LOADER_LINE"
               echo "Firmware: firmware.dfu"
+              # Resources must be listed so the updater deploys FAPs to the SD card
+              [ -f "$UPDATE_DIR/resources.ths" ] && echo "Resources: resources.ths"
               # Include splashscreen if present
               [ -f "$UPDATE_DIR/splash.bin" ] && echo "Splashscreen: splash.bin"
             } > "$UPDATE_DIR/update.fuf"
