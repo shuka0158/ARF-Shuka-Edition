@@ -11,7 +11,13 @@ import sys, heatshrink2, tarfile, io, os
 
 CORE_FAPS = {'infrared.fap', 'ibutton.fap', 'nfc.fap', 'lfrfid.fap', 'gpio.fap', 'bad_usb.fap', 'u2f.fap'}
 
+if len(sys.argv) < 2:
+    print("Usage: slim_resources.py <path_to_resources.ths>", file=sys.stderr)
+    sys.exit(1)
 src_path = sys.argv[1]
+if not os.path.isfile(src_path):
+    print(f"Error: not a regular file: {src_path}", file=sys.stderr)
+    sys.exit(1)
 raw = open(src_path, 'rb').read()
 
 # HSDS header: magic(4) + version(1) + window_sz2(1) + lookahead_sz2(1)
