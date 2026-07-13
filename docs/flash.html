@@ -2,58 +2,463 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>ARF-Shuka-Edition Web Flasher</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARF-Shuka-Edition — Web Flasher</title>
 <style>
+/* ── TOKENS ─────────────────────────────────────────────── */
+:root{
+  --bg:     #0a0a0a;
+  --surf:   #111;
+  --surf2:  #161616;
+  --border: #222;
+  --or:     #ff8c00;
+  --or2:    #ffa333;
+  --text:   #e0e0e0;
+  --muted:  #666;
+  --dim:    #444;
+  --ok:     #5cd47a;
+  --er:     #f06060;
+  --warn:   #ffb060;
+  --r:      6px;
+}
+
+/* ── RESET ──────────────────────────────────────────────── */
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:monospace;background:#0a0a0a;color:#e0e0e0;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1.5rem}
-main{max-width:480px;width:100%}
-h1{font-size:1.5rem;color:#ff8c00;letter-spacing:.05em}
-.sub{color:#555;font-size:.8rem;margin-bottom:1.5rem;margin-top:.2rem}
-.card{background:#111;border:1px solid #222;border-radius:8px;padding:.9rem 1rem;margin-bottom:1.2rem;font-size:.8rem;line-height:1.7;color:#888}
-.card b{color:#ccc}
-.card .val{color:#ff8c00}
-#flashBtn{width:100%;padding:.8rem;background:#ff8c00;color:#000;border:none;border-radius:6px;font-family:monospace;font-size:1rem;font-weight:bold;cursor:pointer;letter-spacing:.03em;transition:opacity .15s}
-#flashBtn:disabled{opacity:.35;cursor:not-allowed}
-#flashBtn:hover:not(:disabled){opacity:.82}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Courier New',Courier,monospace;
+  background:var(--bg);color:var(--text);
+  min-height:100vh;
+  padding:1.5rem 1rem 3rem;
+  line-height:1.6;
+}
+a{color:var(--or);text-decoration:none}
+a:hover{text-decoration:underline}
+img{max-width:100%;display:block;border-radius:4px}
+
+/* ── PAGE LAYOUT ────────────────────────────────────────── */
+.page{
+  display:grid;
+  grid-template-columns:260px 1fr 260px;
+  grid-template-rows:auto 1fr auto;
+  grid-template-areas:
+    "hd hd hd"
+    "sl main sr"
+    "ft ft ft";
+  gap:1.2rem;
+  max-width:1120px;
+  margin:0 auto;
+}
+header{grid-area:hd;text-align:center;padding-bottom:.5rem}
+.sidebar-l{grid-area:sl}
+main{grid-area:main;min-width:0}
+.sidebar-r{grid-area:sr}
+footer{grid-area:ft;text-align:center;color:var(--muted);font-size:.72rem;padding-top:1rem;border-top:1px solid var(--border)}
+
+@media(max-width:900px){
+  .page{
+    grid-template-columns:1fr;
+    grid-template-areas:"hd""main""sl""sr""ft";
+  }
+  .sidebar-l,.sidebar-r{display:flex;flex-direction:row;flex-wrap:wrap;gap:.7rem;justify-content:center}
+  .sidebar-l figure,.sidebar-r figure{width:calc(50% - .35rem);min-width:140px}
+}
+@media(max-width:480px){
+  body{padding:1rem .7rem 2rem}
+  .sidebar-l figure,.sidebar-r figure{width:calc(50% - .35rem)}
+}
+
+/* ── HEADER ─────────────────────────────────────────────── */
+header h1{
+  font-size:1.9rem;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--or);
+  margin-bottom:.3rem;
+}
+header h1 span{color:var(--text);font-size:1.1rem;font-weight:400;letter-spacing:.04em}
+header p{color:var(--muted);font-size:.82rem}
+.badges{margin-top:.7rem;display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap}
+.badges img{display:inline;border-radius:3px;height:20px;width:auto}
+
+/* ── SIDEBAR FIGURES ─────────────────────────────────────── */
+.sidebar-l figure,.sidebar-r figure{
+  margin:0;
+  background:var(--surf);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  overflow:hidden;
+  margin-bottom:.7rem;
+}
+.sidebar-l figure:last-child,.sidebar-r figure:last-child{margin-bottom:0}
+.sidebar-l figure img,.sidebar-r figure img{
+  width:100%;object-fit:cover;
+  border-radius:0;
+}
+.sidebar-l figure figcaption,
+.sidebar-r figure figcaption{
+  font-size:.65rem;color:var(--muted);
+  padding:.35rem .6rem;
+  border-top:1px solid var(--border);
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+
+/* ── CARDS ───────────────────────────────────────────────── */
+.card{
+  background:var(--surf);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  padding:1rem 1.1rem;
+  margin-bottom:1.1rem;
+}
+.card:last-child{margin-bottom:0}
+.card h2{
+  font-size:.68rem;text-transform:uppercase;letter-spacing:.14em;
+  color:var(--or);margin-bottom:.8rem;
+}
+
+/* ── VERSION CARD ────────────────────────────────────────── */
+#versionBox{font-size:.8rem;color:var(--muted);line-height:1.9}
+#versionBox b{color:var(--text)}
+#versionBox .val{color:var(--or);font-weight:700}
+#versionBox .label{color:var(--muted)}
+
+/* ── FLASH CARD ──────────────────────────────────────────── */
+.flash-card h2{font-size:.8rem}
+.card-note{font-size:.73rem;color:var(--muted);margin-bottom:.9rem}
+
+.steps{display:flex;flex-direction:column;gap:.3rem;margin-bottom:.9rem}
+.step{display:flex;align-items:flex-start;gap:.6rem;font-size:.82rem;color:var(--muted)}
+.step-n{color:var(--or);font-weight:700;min-width:1.2rem;flex-shrink:0}
+.step span:last-child{color:var(--text)}
+
+#flashBtn{
+  width:100%;padding:.82rem 1rem;
+  background:var(--or);color:#000;
+  border:none;border-radius:5px;
+  font-family:inherit;font-size:1rem;font-weight:700;
+  cursor:pointer;letter-spacing:.04em;
+  transition:background .12s,opacity .12s;
+}
+#flashBtn:hover:not(:disabled){background:var(--or2)}
+#flashBtn:focus-visible{outline:2px solid var(--or);outline-offset:3px}
+#flashBtn:disabled{background:#2a2a2a;color:#555;cursor:not-allowed}
+
 .prog-wrap{margin-top:1rem;display:none}
-progress{width:100%;height:6px;appearance:none;border:none;border-radius:3px;background:#1e1e1e}
+progress{
+  width:100%;height:6px;
+  appearance:none;-webkit-appearance:none;
+  border:none;border-radius:3px;background:#1e1e1e;
+  display:block;
+}
 progress::-webkit-progress-bar{background:#1e1e1e;border-radius:3px}
-progress::-webkit-progress-value{background:#ff8c00;border-radius:3px;transition:width .25s}
-#status{margin-top:.5rem;font-size:.75rem;color:#666;min-height:1.1em;word-break:break-all}
-#status.err{color:#e05555}
-#status.ok{color:#55c55a}
-.log{margin-top:.8rem;background:#050505;border:1px solid #1a1a1a;border-radius:6px;padding:.6rem .8rem;font-size:.72rem;color:#555;max-height:200px;overflow-y:auto;line-height:1.7;display:none}
-.log .ok{color:#5cd47a}.log .er{color:#f06060}.log .in{color:#ffb060}.log .dm{color:#333}
-.note{margin-top:1.4rem;font-size:.72rem;color:#444;line-height:1.6}
-.note a{color:#555;text-decoration:none}
-.note a:hover{color:#888}
+progress::-webkit-progress-value{background:var(--or);border-radius:3px;transition:width .25s}
+progress::-moz-progress-bar{background:var(--or);border-radius:3px}
+
+#status{
+  margin-top:.5rem;font-size:.75rem;color:var(--muted);
+  min-height:1.1em;word-break:break-all;
+}
+#status.err{color:var(--er)}
+#status.ok{color:var(--ok)}
+
+.log{
+  margin-top:.8rem;
+  background:#050505;border:1px solid #181818;
+  border-radius:5px;padding:.6rem .8rem;
+  font-size:.72rem;color:#555;
+  max-height:200px;overflow-y:auto;
+  line-height:1.7;display:none;
+  word-break:break-all;
+}
+.log .ok{color:var(--ok)}.log .er{color:var(--er)}
+.log .in{color:var(--warn)}.log .dm{color:#333}
+
+/* ── PROTOCOL TABLE ──────────────────────────────────────── */
+.proto-table{
+  width:100%;border-collapse:collapse;
+  font-size:.72rem;
+  overflow-x:auto;display:block;
+}
+.proto-table th{
+  color:var(--or);font-weight:700;
+  text-transform:uppercase;letter-spacing:.08em;
+  padding:.35rem .5rem;border-bottom:1px solid var(--border);
+  text-align:left;white-space:nowrap;
+}
+.proto-table td{
+  padding:.35rem .5rem;
+  border-bottom:1px solid #1a1a1a;
+  color:var(--muted);
+  vertical-align:top;
+}
+.proto-table td:first-child{color:var(--text);font-weight:700;white-space:nowrap}
+.proto-table td:nth-child(2){color:var(--dim);font-size:.68rem}
+.star{color:var(--or)}
+
+/* ── GATE LIST ───────────────────────────────────────────── */
+.gate-list{
+  font-size:.72rem;color:var(--muted);line-height:2;
+  margin-top:.2rem;
+}
+.gate-list .chip{
+  display:inline-block;
+  background:#181818;border:1px solid #252525;
+  border-radius:3px;padding:.05rem .4rem;
+  margin:.1rem .15rem;
+  color:var(--dim);font-size:.68rem;
+}
+
+/* ── MANUAL INSTALL ──────────────────────────────────────── */
+.install-steps{display:flex;flex-direction:column;gap:.35rem;margin-top:.5rem}
+.install-step{font-size:.78rem;color:var(--muted)}
+.install-step b{color:var(--text)}
+code{
+  background:#181818;border:1px solid #252525;
+  border-radius:3px;padding:.05rem .35rem;
+  font-family:inherit;font-size:.75rem;color:var(--or);
+}
+
+/* ── RECOVERY CARD ───────────────────────────────────────── */
+.recovery-steps{font-size:.75rem;color:var(--muted);line-height:1.8;padding-left:1.1rem}
+.recovery-steps li{margin-bottom:.15rem}
+.recovery-steps li b{color:var(--text)}
+
+/* ── FOOTER ──────────────────────────────────────────────── */
+footer p{margin-bottom:.3rem}
+
+/* ── ANIMATIONS ──────────────────────────────────────────── */
+@media(prefers-reduced-motion:reduce){
+  progress::-webkit-progress-value{transition:none}
+  #flashBtn{transition:none}
+}
 </style>
 </head>
 <body>
+<div class="page">
+
+<!-- ── HEADER ──────────────────────────────────────────── -->
+<header>
+  <h1>ARF-Shuka-Edition <span>by shuka0158</span></h1>
+  <p>Custom Flipper Zero firmware · Built on <a href="https://github.com/D4C1-Labs/Flipper-ARF" target="_blank" rel="noopener">D4C1-Labs/Flipper-ARF</a> · 6 extra automotive RKE protocols</p>
+  <div class="badges">
+    <a href="https://github.com/shuka0158/ARF-Shuka-Edition/actions/workflows/build.yml" target="_blank" rel="noopener">
+      <img src="https://github.com/shuka0158/ARF-Shuka-Edition/actions/workflows/build.yml/badge.svg" alt="Build status">
+    </a>
+  </div>
+</header>
+
+<!-- ── LEFT SIDEBAR ────────────────────────────────────── -->
+<aside class="sidebar-l" aria-label="Screenshots — UI">
+  <figure>
+    <img src="screenshots/boot.png" alt="Custom boot splash screen shown after firmware install" width="828" height="484" loading="lazy">
+    <figcaption>Boot splash</figcaption>
+  </figure>
+  <figure>
+    <img src="screenshots/grid_menu.png" alt="Icon grid menu — 4×3 app grid" width="828" height="484" loading="lazy">
+    <figcaption>Icon grid menu</figcaption>
+  </figure>
+  <figure>
+    <img src="screenshots/idle_car_key.png" alt="Idle animation — car key" width="826" height="498" loading="lazy">
+    <figcaption>Idle — Car Key</figcaption>
+  </figure>
+  <figure>
+    <img src="screenshots/idle_signal_bars.png" alt="Idle animation — signal bars" width="512" height="256" loading="lazy">
+    <figcaption>Idle — Signal Bars</figcaption>
+  </figure>
+</aside>
+
+<!-- ── MAIN CONTENT ─────────────────────────────────────── -->
 <main>
-  <h1>ARF-Shuka-Edition</h1>
-  <p class="sub">Web Flasher &mdash; Chrome / Edge only</p>
 
-  <div class="card" id="versionBox">Loading version info&hellip;</div>
-
-  <button id="flashBtn">&#9889; Connect &amp; Flash Flipper</button>
-
-  <div class="prog-wrap" id="progWrap">
-    <progress id="prog" value="0" max="100"></progress>
-    <div id="status"></div>
+  <!-- Version info -->
+  <div class="card" id="versionBox" aria-live="polite" aria-label="Build information">
+    Loading build info&hellip;
   </div>
 
-  <div class="log" id="log"></div>
+  <!-- Web Flasher -->
+  <div class="card flash-card">
+    <h2>⚡ Web Flasher</h2>
+    <p class="card-note">Chrome / Edge 89+ only &mdash; Firefox has no WebSerial</p>
 
-  <p class="note">
-    Requires <a href="https://caniuse.com/web-serial" target="_blank">WebSerial</a> (Chrome&nbsp;89+, Edge&nbsp;89+).
-    Firefox is not supported.<br>
-    Flipper must be on the <b>home screen</b> before clicking Flash.
-    Upload takes ~30&nbsp;s, then Flipper installs automatically. Do not unplug.
-  </p>
+    <div class="steps" aria-label="Steps to flash">
+      <div class="step"><span class="step-n" aria-hidden="true">1</span><span>Connect Flipper Zero via USB</span></div>
+      <div class="step"><span class="step-n" aria-hidden="true">2</span><span>Flipper must be on the <b>home screen</b></span></div>
+      <div class="step"><span class="step-n" aria-hidden="true">3</span><span>Click Flash &rarr; select the Flipper port &rarr; wait ~60 s</span></div>
+    </div>
+
+    <button id="flashBtn" aria-describedby="status">&#9889;&nbsp;Connect &amp; Flash Flipper</button>
+
+    <div class="prog-wrap" id="progWrap" role="status" aria-label="Flash progress">
+      <progress id="prog" value="0" max="100" aria-label="Flash progress"></progress>
+      <div id="status"></div>
+    </div>
+
+    <div class="log" id="log" aria-live="polite" aria-label="Flash log"></div>
+  </div>
+
+  <!-- New protocols -->
+  <div class="card">
+    <h2>★ 6 New Automotive RKE Protocols</h2>
+    <div style="overflow-x:auto">
+      <table class="proto-table">
+        <thead>
+          <tr>
+            <th>Protocol</th>
+            <th>Brands</th>
+            <th>Encoding</th>
+            <th>Frame</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="star">★</span> GM Rolling</td>
+            <td>Chevrolet, GMC, Buick, Cadillac (2000–2015)</td>
+            <td>Manchester</td>
+            <td>64-bit, XOR</td>
+          </tr>
+          <tr>
+            <td><span class="star">★</span> Honda/Acura</td>
+            <td>Civic, CR-V, Accord (2007+) / Acura TL, MDX</td>
+            <td>PWM</td>
+            <td>64-bit, CRC-8 0x2F</td>
+          </tr>
+          <tr>
+            <td><span class="star">★</span> Hyundai New</td>
+            <td>Hyundai (2017+), Genesis</td>
+            <td>PWM</td>
+            <td>64-bit, CRC-8 0x31</td>
+          </tr>
+          <tr>
+            <td><span class="star">★</span> Nissan</td>
+            <td>Nissan, Infiniti (2003–2018)</td>
+            <td>PWM</td>
+            <td>64-bit, CRC-8 0x97</td>
+          </tr>
+          <tr>
+            <td><span class="star">★</span> Renault</td>
+            <td>Renault, Dacia — Clio/Megane/Duster (2005–2020)</td>
+            <td>PCM biphase</td>
+            <td>64-bit, XOR</td>
+          </tr>
+          <tr>
+            <td><span class="star">★</span> Toyota/Lexus</td>
+            <td>Corolla, Camry, RAV4, Hilux, Land Cruiser, Lexus IS/RX/GS (2003–2020)</td>
+            <td>PWM</td>
+            <td>72-bit, CRC-8 0xEA</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:.7rem;color:var(--muted);margin-top:.6rem">
+      Plus X10 home automation (310 MHz AM, decode-only). All 64 ARF protocols unchanged.
+      Automotive protocols activate automatically when a matching signal is received — nothing to configure.
+    </p>
+  </div>
+
+  <!-- 4 custom animations -->
+  <div class="card">
+    <h2>4 Custom Idle Animations</h2>
+    <p style="font-size:.78rem;color:var(--muted)">
+      Embedded in the firmware — no SD card copy-paste needed.
+      The Flipper shows these on the idle desktop after flashing.
+    </p>
+    <div class="gate-list" style="margin-top:.6rem">
+      <span class="chip">Binary Rain</span>
+      <span class="chip">Car Key</span>
+      <span class="chip">Signal Bars</span>
+      <span class="chip">Heisenberg</span>
+    </div>
+    <p style="font-size:.7rem;color:var(--muted);margin-top:.6rem">
+      Go to <b style="color:var(--text)">Settings &rarr; Desktop</b> to set Menu Layout (Classic list or Icon Grid), Scroll Style, and Scroll Animation.
+    </p>
+  </div>
+
+  <!-- Gate protocols -->
+  <div class="card">
+    <h2>Gate &amp; Garage Protocols (from ARF)</h2>
+    <div class="gate-list">
+      <span class="chip">CAME</span><span class="chip">CAME Atomo</span><span class="chip">CAME Twee</span>
+      <span class="chip">Chamberlain</span><span class="chip">Doitrand</span>
+      <span class="chip">FAAC SLH</span><span class="chip">Gate TX</span>
+      <span class="chip">Holtek</span><span class="chip">Holtek HT12X</span>
+      <span class="chip">Hormann</span><span class="chip">Keeloq</span>
+      <span class="chip">KingGates Stylo 4K</span><span class="chip">Linear</span>
+      <span class="chip">Linear Delta 3</span><span class="chip">Marantec</span>
+      <span class="chip">Mastercode</span><span class="chip">Megacode</span>
+      <span class="chip">Nice Flo</span><span class="chip">Nice Flor-S</span>
+      <span class="chip">Phoenix V2</span><span class="chip">Princeton</span>
+      <span class="chip">SMC5326</span><span class="chip">Security+ V1</span>
+      <span class="chip">Security+ V2</span><span class="chip">Somfy Keytis</span>
+      <span class="chip">Somfy Telis</span><span class="chip">RAW</span>
+      <span class="chip">BIN RAW</span>
+    </div>
+  </div>
+
+  <!-- Manual install -->
+  <div class="card">
+    <h2>Manual Install (qFlipper)</h2>
+    <div class="install-steps">
+      <div class="install-step">1. Download <code>flipper-z-f7-update-arf-shuka-edition.tgz</code> from <a href="https://github.com/shuka0158/ARF-Shuka-Edition/releases" target="_blank" rel="noopener">Releases ↗</a></div>
+      <div class="install-step">2. Open <b>qFlipper &rarr; Install from file</b> &rarr; select the <code>.tgz</code></div>
+      <div class="install-step">3. Done — firmware + all apps installed in one step</div>
+    </div>
+    <p style="margin-top:.7rem;font-size:.72rem;color:var(--dim)">
+      For firmware-only (no SD card changes): download <code>flipper-z-f7-full-arf-shuka-edition.dfu</code> instead.
+    </p>
+  </div>
+
+  <!-- Recovery -->
+  <div class="card">
+    <h2>Recovery (Bricked Flipper)</h2>
+    <ol class="recovery-steps">
+      <li><b>Unplug</b> USB completely</li>
+      <li><b>Hold BACK</b> for 30 s &mdash; hardware-level reset</li>
+      <li><b>Hold BACK + LEFT</b> for 3 s &mdash; soft reboot</li>
+      <li><b>Hold BACK + OK</b> for 35 s</li>
+      <li>At 35 s: <b>release BACK</b>, keep holding OK</li>
+      <li>While holding OK: <b>plug in USB</b></li>
+      <li>Open qFlipper &rarr; <b>Repair Firmware</b></li>
+    </ol>
+    <p style="margin-top:.6rem;font-size:.7rem;color:var(--dim)">
+      Forces STM32 into hardware boot ROM recovery mode — bypasses any broken firmware entirely.
+    </p>
+  </div>
+
 </main>
 
+<!-- ── RIGHT SIDEBAR ─────────────────────────────────────── -->
+<aside class="sidebar-r" aria-label="Screenshots — protocols">
+  <figure>
+    <img src="screenshots/protocols.png" alt="88+ SubGHz protocols visible in menu" width="828" height="484" loading="lazy">
+    <figcaption>88+ Protocols</figcaption>
+  </figure>
+  <figure>
+    <img src="screenshots/vag_decoded.png" alt="VAG Group signal decoded live" width="826" height="498" loading="lazy">
+    <figcaption>VAG decoded signal</figcaption>
+  </figure>
+  <figure>
+    <img src="screenshots/new_features.png" alt="New build features screen" width="826" height="498" loading="lazy">
+    <figcaption>New features</figcaption>
+  </figure>
+  <figure>
+    <img src="screenshots/subghz_heisenberg.png" alt="SubGHz Heisenberg mode" width="512" height="256" loading="lazy">
+    <figcaption>SubGHz — Heisenberg</figcaption>
+  </figure>
+</aside>
+
+<!-- ── FOOTER ──────────────────────────────────────────── -->
+<footer>
+  <p>
+    <a href="https://github.com/shuka0158/ARF-Shuka-Edition" target="_blank" rel="noopener">shuka0158/ARF-Shuka-Edition</a>
+    &nbsp;·&nbsp; Built on <a href="https://github.com/D4C1-Labs/Flipper-ARF" target="_blank" rel="noopener">D4C1-Labs/Flipper-ARF</a>
+    &nbsp;·&nbsp; <a href="https://arf.d4c1.com/" target="_blank" rel="noopener">Official ARF site</a>
+  </p>
+  <p style="margin-top:.35rem;color:#333">For educational and research purposes only.</p>
+</footer>
+
+</div><!-- .page -->
+
+<!-- ── SCRIPTS ─────────────────────────────────────────── -->
 <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/protobufjs@7.4.0/dist/protobuf.min.js"></script>
 <script>
@@ -61,10 +466,10 @@ progress::-webkit-progress-value{background:#ff8c00;border-radius:3px;transition
 
 // ── CONFIG ───────────────────────────────────────────────────────
 const TGZ_URL = 'latest-update.tgz';
-const CHUNK   = 4096; // 4 KB chunks — same reliability, 8× faster than 512 B
+const CHUNK   = 4096;
 const VID     = 0x0483;
 
-// ── PROTOBUF SCHEMA (FoxFW v56 — field numbers verified against real proto source) ──
+// ── PROTOBUF SCHEMA ──────────────────────────────────────────────
 const PROTO_JSON = {
   nested: { PB: { nested: {
     Main: {
@@ -109,7 +514,7 @@ function initProto() {
 function encodeMain(obj) {
   const err = Main.verify(obj);
   if (err) throw new Error('Protobuf encode error: ' + err);
-  return Main.encodeDelimited(obj).finish(); // varint(length) + message bytes
+  return Main.encodeDelimited(obj).finish();
 }
 
 // ── STATE ────────────────────────────────────────────────────────
@@ -117,7 +522,7 @@ let cmdId = 1;
 let serialPort = null, serialWriter = null, serialReader = null;
 let rxQueue = [], pumpActive = false, pumpTask = null;
 
-// ── PUMP (FoxFW v56 — single continuous reader, never release/re-acquire) ──
+// ── PUMP ─────────────────────────────────────────────────────────
 function startPump() {
   rxQueue = []; pumpActive = true;
   pumpTask = (async () => {
@@ -244,9 +649,9 @@ async function rpcWriteFile(path, data, onProgress) {
     const hasNext = (i + CHUNK) < data.length;
     await wMsg(encodeMain({
       commandId: id, hasNext,
-      storageWriteRequest: { path, file: { data: chunk } } // path on every chunk
+      storageWriteRequest: { path, file: { data: chunk } }
     }));
-    await sleep(7); // flat inter-chunk gap (matches lab.flipper.net)
+    await sleep(7);
     const sent = Math.min(i + CHUNK, data.length);
     const sentKB = (sent / 1024).toFixed(0);
     if (onProgress) onProgress(sent / data.length, sentKB, totalKB);
@@ -271,7 +676,6 @@ async function doFlash() {
   setProgress(0); setStatus('');
 
   try {
-    // 1. Port picker
     setStatus('Select your Flipper in the port picker…');
     let port;
     try {
@@ -282,7 +686,6 @@ async function doFlash() {
       return;
     }
 
-    // 2. Open serial — FoxFW v56 approach: 115200 + hardware flow + DTR
     try {
       await port.open({ baudRate:115200, flowControl:'hardware' });
     } catch (e) {
@@ -296,12 +699,11 @@ async function doFlash() {
     startPump();
     logLine('Port opened + DTR asserted', 'ok');
 
-    // 3. Start RPC session — FoxFW v56 approach
     setStatus('Starting RPC session…');
     await waitForQuiet(300, 5000);
     await serialWriter.write(new TextEncoder().encode('\r\n'));
     await waitForQuiet(200, 2000);
-    await serialWriter.write(new TextEncoder().encode('start_rpc_session\r')); // bare \r, NOT \r\n
+    await serialWriter.write(new TextEncoder().encode('start_rpc_session\r'));
     const gotAck = await waitForByte(0x0A, 3000);
     if (!gotAck) throw new Error('Flipper did not acknowledge start_rpc_session. Make sure Flipper is on the HOME SCREEN.');
     logLine('start_rpc_session acknowledged ✓', 'ok');
@@ -313,15 +715,11 @@ async function doFlash() {
     logLine('RPC session active ✓', 'ok');
     setProgress(0.03);
 
-    // 4. Download TGZ
     setStatus('Downloading firmware…');
     const tgz = await fetchXHR(TGZ_URL, p => { setProgress(0.03 + p * 0.25); setStatus('Downloading… ' + Math.round(p*100) + '%'); });
     logLine('Downloaded ' + (tgz.length/1024/1024).toFixed(1) + ' MB', 'ok');
     setProgress(0.28);
 
-    // 5. Decompress + parse
-    // pako.inflate on a 12 MB bundle blocks the JS event loop for several seconds.
-    // Yield first so the pump drains any buffered serial bytes, then inflate.
     setStatus('Decompressing…');
     await sleep(50);
     const tar   = pako.inflate(tgz);
@@ -330,8 +728,6 @@ async function doFlash() {
     logLine('Found ' + files.length + ' files in bundle', 'ok');
     setProgress(0.32);
 
-    // Re-ping after the synchronous decompression to confirm the RPC link
-    // is still alive (the event-loop freeze can leave the serial link stale).
     await sleep(100);
     const ping2Id = cmdId++;
     await serialWriter.write(encodeMain({ commandId:ping2Id, systemPingRequest:{} }));
@@ -339,19 +735,17 @@ async function doFlash() {
     if (!pong2) throw new Error('Connection lost during decompression — reboot Flipper and try again.');
     logLine('Connection verified after decompression ✓', 'ok');
 
-    const topDir     = files[0].name.split('/')[0];
-    const sdBase     = '/ext/update/' + topDir;
-    const manifest   = files.find(f => f.name.endsWith('update.fuf'));
+    const topDir   = files[0].name.split('/')[0];
+    const sdBase   = '/ext/update/' + topDir;
+    const manifest = files.find(f => f.name.endsWith('update.fuf'));
     if (!manifest) throw new Error('update.fuf not found in package');
     const manifestSD = '/ext/update/' + manifest.name;
 
-    // 6. Create directories
     setStatus('Preparing SD card…');
     await rpcMkdir('/ext/update');
     await rpcMkdir(sdBase);
     setProgress(0.35);
 
-    // 7. Upload files
     let totalBytes = files.reduce((s, f) => s + f.data.length, 0);
     let uploadedBytes = 0;
     for (let fi = 0; fi < files.length; fi++) {
@@ -368,7 +762,6 @@ async function doFlash() {
     }
     setProgress(0.93);
 
-    // 8. Trigger update (TWO-step: validate manifest, then reboot into update)
     setStatus('Triggering firmware update…');
     const upId = cmdId++;
     await serialWriter.write(encodeMain({ commandId:upId, systemUpdateRequest:{ updateManifest:manifestSD } }));
@@ -395,7 +788,7 @@ async function doFlash() {
   }
 }
 
-// ── TAR PARSER (FoxFW v56 verbatim) ─────────────────────────────
+// ── TAR PARSER ───────────────────────────────────────────────────
 function parseTar(buf) {
   const bytes=new Uint8Array(buf),td=new TextDecoder(),files=[];
   let off=0;
@@ -410,7 +803,7 @@ function parseTar(buf) {
   return files;
 }
 
-// ── XHR DOWNLOAD ────────────────────────────────────────────────
+// ── XHR DOWNLOAD ─────────────────────────────────────────────────
 function fetchXHR(url, onProg) {
   return new Promise((ok, fail) => {
     const x = new XMLHttpRequest();
@@ -429,25 +822,28 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   if (!('serial' in navigator)) {
     btn.disabled = true;
+    btn.textContent = '⚠ WebSerial not supported — use Chrome or Edge';
     document.getElementById('versionBox').innerHTML =
-      '&#9888; WebSerial not supported.<br>Open this page in <b>Chrome</b> or <b>Edge</b>.';
+      '<b style="color:var(--er)">⚠ WebSerial not supported.</b> Open this page in <b>Chrome</b> or <b>Edge</b> (version 89+).';
     return;
   }
 
   if (typeof protobuf !== 'undefined') initProto();
   else setTimeout(() => { if (typeof protobuf !== 'undefined') initProto(); }, 500);
 
+  btn.addEventListener('click', doFlash);
+
   try {
     const lines = (await fetch('latest-build.txt').then(r => r.text())).trim().split('\n');
     document.getElementById('versionBox').innerHTML =
-      `<b>Version:</b> <span class="val">${lines[0]||'?'}</span> &nbsp;`+
-      `<b>ARF:</b> <span class="val">${lines[1]||'?'}</span><br>`+
-      `<b>Built:</b> ${lines[2]||'?'}`;
+      '<h2>Latest Build</h2>' +
+      '<b class="label">Build:</b> <span class="val">' + (lines[0]||'?') + '</span>' +
+      ' &nbsp; <b class="label">ARF base:</b> <span class="val">' + (lines[1]||'?') + '</span>' +
+      '<br><b class="label">Built:</b> ' + (lines[2]||'?') +
+      ' &nbsp; &mdash; &nbsp; <a href="https://github.com/shuka0158/ARF-Shuka-Edition/releases" target="_blank" rel="noopener">All releases ↗</a>';
   } catch {
-    document.getElementById('versionBox').textContent = 'Version info unavailable';
+    document.getElementById('versionBox').textContent = 'Build info unavailable';
   }
-
-  btn.addEventListener('click', doFlash);
 });
 </script>
 </body>
