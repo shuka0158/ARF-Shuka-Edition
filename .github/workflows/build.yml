@@ -330,6 +330,36 @@ jobs:
           fi
           bash shuka-edition/scripts/check_size.sh "$DFU"
 
+      - name: Inject NSFW animations into firmware resources pack
+        run: |
+          # Clone the NSFW collection (shallow, no history needed)
+          git clone --depth 1 \
+            https://github.com/dfwrxss/Flipper-NSFW-Animation-Collection.git \
+            nsfw-anim-src
+
+          # Find the resources.ths built by fbt
+          UPDATE_DIR=$(find flipper-fw/dist -maxdepth 3 -type d -name "*update*" \
+            | grep -v '\.dfu' | head -1)
+          RESOURCES_THS="$UPDATE_DIR/resources.ths"
+
+          if [ ! -f "$RESOURCES_THS" ]; then
+            echo "WARNING: resources.ths not found — skipping NSFW injection"
+          else
+            echo "Injecting into: $RESOURCES_THS ($(du -sh "$RESOURCES_THS" | cut -f1))"
+            python3 shuka-edition/scripts/inject_nsfw_anims.py \
+              "$RESOURCES_THS" \
+              nsfw-anim-src
+            echo "resources.ths after injection: $(du -sh "$RESOURCES_THS" | cut -f1)"
+          fi
+
+          # Build SD card zip of the NSFW pack for release download
+          mkdir -p artifacts_anim
+          (cd nsfw-anim-src && zip -r ../artifacts_anim/NSFW-Shuka-animations.zip . \
+            --exclude="*.md" --exclude="*.DS_Store" 2>/dev/null)
+          echo "NSFW SD pack: $(du -sh artifacts_anim/NSFW-Shuka-animations.zip | cut -f1)"
+
+          rm -rf nsfw-anim-src
+
       - name: Collect artifacts
         run: |
           mkdir -p artifacts
@@ -394,8 +424,9 @@ jobs:
             find flipper-fw/dist -type d | sort
           fi
 
-          # Include animation pack
+          # Include animation packs
           cp artifacts_anim/ARF-Shuka-animations.zip artifacts/ 2>/dev/null || true
+          cp artifacts_anim/NSFW-Shuka-animations.zip artifacts/ 2>/dev/null || true
           echo "=== artifacts/ ==="
           ls -lh artifacts/
 
@@ -457,5 +488,9 @@ jobs:
             Updates the firmware binary only, does not touch your SD card.
 
             See [README](README.md) for full instructions and protocol list.
+
+            ### Animations
+            NSFW animations are embedded in the OTA bundle and deploy automatically to `/ext/dolphin/external/` on your SD card.
+            Download `NSFW-Shuka-animations.zip` if you want to manually copy them to the SD card (without flashing).
           draft: false
           prerelease: false
