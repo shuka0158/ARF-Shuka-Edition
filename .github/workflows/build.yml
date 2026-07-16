@@ -168,18 +168,33 @@ jobs:
             echo "Stripped: $proto"
           done
 
-          # Re-enable standard SubGHz protocols needed by the SubGHz Bruteforcer app.
-          # ARF comments these out by default (it focuses on automotive RKE), but the
-          # bruteforcer looks them up by name at runtime — if missing, furi_crash fires.
+          # Re-enable ALL standard SubGHz protocols that ARF comments out.
+          # ARF strips non-automotive protocols to save flash; we restore full coverage.
+          # Exact names taken from ARF protocol_items.c //&subghz_protocol_<name>, lines.
           PROTO_ITEMS=flipper-fw/lib/subghz/protocols/protocol_items.c
-          for proto in gate_tx came nice_flo princeton linear linear_delta3 holtek chamb_code bett doitrand magellan intertechno_v3 clemsa ansonic smc5326; do
+          for proto in \
+            alutech_at_4n ansonic beninca_arc bett \
+            came came_atomo came_twee chamb_code clemsa \
+            dickert_mahs doitrand dooya elplast \
+            faac_slh feron gangqi gate_tx \
+            hay21 hollarm holtek holtek_th12x \
+            honeywell honeywell_wdb hormann ido \
+            intertechno_v3 jarolift keyfinder kinggates_stylo_4k \
+            legrand linear linear_delta3 magellan \
+            marantec marantec24 mastercode megacode \
+            nero_radio nero_sketch nice_flo nice_flor_s \
+            phoenix_v2 power_smart princeton revers_rb2 \
+            roger secplus_v1 secplus_v2 smc5326 \
+            somfy_keytis somfy_telis toyota treadmill37; do
             if grep -q "//&subghz_protocol_${proto}," "$PROTO_ITEMS"; then
               sed -i -E "s|//(&subghz_protocol_${proto},)|\1|" "$PROTO_ITEMS"
               echo "  uncommented: ${proto}"
             else
-              echo "  WARNING: ${proto} not found commented-out in registry" >&2
+              echo "  note: ${proto} not found commented-out (already active or renamed)"
             fi
           done
+          ENABLED=$(grep -c "^\s*&subghz_protocol_" "$PROTO_ITEMS" || true)
+          echo "Total active protocol entries: ${ENABLED}"
 
       - name: Add Shuka-Edition protocols on top of ARF
         run: |
