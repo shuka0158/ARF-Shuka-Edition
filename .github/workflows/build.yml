@@ -144,16 +144,25 @@ jobs:
             rm -rf "flipper-fw/applications/system/${app}"
             echo "  removed incompatible system FAP: ${app}"
           done
-          # 2) Find FAPs by appid in their .fam file and delete their directory.
+          # 2) Find FAPs by appid in their .fam file and surgically remove them.
           #    cli_ikey builds ibutton_cli.c which needs ibutton_key.h (missing in ARF SDK).
+          #    IMPORTANT: only delete the .fam + the broken source files, NOT the whole
+          #    directory — cli_ikey lives inside applications/main/ibutton which also
+          #    contains the main iButton GUI app (a menu entry).  rm -rf the dir kills iButton.
           for appid in cli_ikey; do
             FAM=$(grep -rl "\"${appid}\"" flipper-fw/applications/ --include="*.fam" 2>/dev/null | head -1)
             if [ -n "$FAM" ]; then
               FAP_DIR=$(dirname "$FAM")
-              rm -rf "$FAP_DIR"
-              echo "  removed incompatible FAP '${appid}' at ${FAP_DIR}"
+              rm -f "$FAM"
+              echo "  removed .fam for '${appid}': $FAM"
+              # Remove any source files in the same dir that pull in the incompatible header
+              while IFS= read -r src; do
+                [ -n "$src" ] || continue
+                rm -f "$src"
+                echo "  removed incompatible source: $(basename "$src")"
+              done < <(grep -rl "ibutton_key\.h" "$FAP_DIR" --include="*.c" --include="*.h" 2>/dev/null || true)
             else
-              echo "  FAP '${appid}' not found by appid — skipping"
+              echo "  FAP '${appid}' not found — skipping"
             fi
           done
           echo "System FAP cleanup done"
