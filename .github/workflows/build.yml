@@ -383,7 +383,20 @@ jobs:
             echo "resources.ths after injection: $(du -sh "$RESOURCES_THS" | cut -f1)"
           fi
 
-          # Build SD card zip of the NSFW pack for release download
+          # Build SD card zip of the NSFW pack for release download.
+          # Generate manifest.txt so the Flipper knows which animations to display
+          # when the user manually extracts the zip into SD:/dolphin/external/.
+          printf "Filetype: Flipper Animation Manifest\nVersion: 1" \
+            > nsfw-anim-src/manifest.txt
+          for dir in $(find nsfw-anim-src -mindepth 1 -maxdepth 1 -type d | sort); do
+            name=$(basename "$dir")
+            if [ -f "${dir}/meta.txt" ]; then
+              printf "\n\nName: %s\nMin butthurt: 0\nMax butthurt: 18\nMin level: 1\nMax level: 30\nWeight: 3" \
+                "$name" >> nsfw-anim-src/manifest.txt
+            fi
+          done
+          printf "\n" >> nsfw-anim-src/manifest.txt
+          echo "manifest.txt: $(grep -c "^Name:" nsfw-anim-src/manifest.txt) animations listed"
           mkdir -p artifacts_anim
           (cd nsfw-anim-src && zip -r ../artifacts_anim/NSFW-Shuka-animations.zip . \
             --exclude="*.md" --exclude="*.DS_Store" 2>/dev/null)
