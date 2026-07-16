@@ -177,16 +177,18 @@ jobs:
           #   ido keyfinder nero_radio nero_sketch power_smart
           #   revers_rb2 roger treadmill37
           # Everything else: re-enabled for full user coverage.
+          # Also cut: holtek_th12x (variant of holtek), marantec24 (variant of marantec),
+          #   honeywell_wdb (doorbell variant), beninca_arc, legrand — saves ~10 KB.
           for proto in \
-            alutech_at_4n ansonic beninca_arc bett \
+            alutech_at_4n ansonic bett \
             came came_atomo came_twee chamb_code clemsa \
             doitrand dooya \
             faac_slh gate_tx \
-            holtek holtek_th12x \
-            honeywell honeywell_wdb hormann \
+            holtek \
+            honeywell hormann \
             intertechno_v3 jarolift kinggates_stylo_4k \
-            legrand linear linear_delta3 magellan \
-            marantec marantec24 mastercode megacode \
+            linear linear_delta3 magellan \
+            marantec mastercode megacode \
             nice_flo nice_flor_s \
             phoenix_v2 princeton \
             secplus_v1 secplus_v2 smc5326 \
