@@ -181,21 +181,26 @@ jobs:
           # ARF strips non-automotive protocols to save flash; we restore full coverage.
           # Exact names taken from ARF protocol_items.c //&subghz_protocol_<name>, lines.
           PROTO_ITEMS=flipper-fw/lib/subghz/protocols/protocol_items.c
-          # Cut list (too obscure / regional to justify the flash cost):
+          # Cut list (too obscure / regional / non-automotive to justify the flash cost):
           #   dickert_mahs elplast feron gangqi hay21 hollarm
           #   ido keyfinder nero_radio nero_sketch power_smart
           #   revers_rb2 roger treadmill37
-          # Everything else: re-enabled for full user coverage.
           # Also cut: holtek_th12x (variant of holtek), marantec24 (variant of marantec),
           #   honeywell_wdb (doorbell variant), beninca_arc, legrand — saves ~10 KB.
+          # Non-automotive home-automation cut (flash space for new vehicle protocols):
+          #   dooya      — Chinese motorized blinds/fans/curtains, not gates
+          #   intertechno_v3 — smart home lighting switches/dimmers, zero automotive use
+          #   jarolift   — German motorized blinds, not automotive
+          #   doitrand   — niche regional French gate brand
+          #   chamb_code — old Chamberlain fixed code; secplus_v1/v2 covers all modern units
+          #   ansonic    — generic RF largely overlapping princeton/gate_tx
           for proto in \
-            alutech_at_4n ansonic bett \
-            came came_atomo came_twee chamb_code clemsa \
-            doitrand dooya \
+            alutech_at_4n bett \
+            came came_atomo came_twee clemsa \
             faac_slh gate_tx \
             holtek \
             honeywell hormann \
-            intertechno_v3 jarolift kinggates_stylo_4k \
+            kinggates_stylo_4k \
             linear linear_delta3 magellan \
             marantec mastercode megacode \
             nice_flo nice_flor_s \
