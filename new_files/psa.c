@@ -467,8 +467,8 @@ __attribute__((optimize("O3"))) static bool psa_brute_force_decrypt_bf2(SubGhzPr
             
             uint8_t crc_buffer[6] = {
                 (uint8_t)((dec_v0 >> 24) & 0xFF),
-                (uint8_t)((dec_v0 >> 8) & 0xFF),
                 (uint8_t)((dec_v0 >> 16) & 0xFF),
+                (uint8_t)((dec_v0 >> 8) & 0xFF),
                 (uint8_t)(dec_v0 & 0xFF),
                 (uint8_t)((dec_v1 >> 24) & 0xFF),
                 (uint8_t)((dec_v1 >> 16) & 0xFF),
@@ -493,6 +493,7 @@ static bool psa_direct_xor_decrypt(SubGhzProtocolDecoderPSA* instance, uint8_t* 
 
     uint8_t validation_result = (checksum ^ key2_high) & 0xF0;
     if(validation_result == 0) {
+        buffer[8] = (buffer[8] & 0x0F) | (checksum & 0xF0);
         buffer[13] = buffer[9] ^ buffer[8];
         psa_second_stage_xor_decrypt(buffer);
         psa_extract_fields_mode23(buffer, instance);
