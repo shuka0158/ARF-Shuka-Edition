@@ -194,19 +194,24 @@ jobs:
           #   doitrand   — niche regional French gate brand
           #   chamb_code — old Chamberlain fixed code; secplus_v1/v2 covers all modern units
           #   ansonic    — generic RF largely overlapping princeton/gate_tx
+          # Round 2 cut (865 KB still 5 KB over 860 KB C2 boundary):
+          #   somfy_keytis, somfy_telis — shutter/awning remotes, same "not automotive"
+          #     category as dooya/jarolift above, should have been cut with them
+          #   bett, clemsa, kinggates_stylo_4k, magellan, mastercode, phoenix_v2 —
+          #     niche regional gate brands with low real-world encounter rate,
+          #     overlapping coverage from princeton/gate_tx/came/nice generics
           for proto in \
-            alutech_at_4n bett \
-            came came_atomo came_twee clemsa \
+            alutech_at_4n \
+            came came_atomo came_twee \
             faac_slh gate_tx \
             holtek \
             honeywell hormann \
-            kinggates_stylo_4k \
-            linear linear_delta3 magellan \
-            marantec mastercode megacode \
+            linear linear_delta3 \
+            marantec megacode \
             nice_flo nice_flor_s \
-            phoenix_v2 princeton \
+            princeton \
             secplus_v1 secplus_v2 smc5326 \
-            somfy_keytis somfy_telis toyota; do
+            toyota; do
             if grep -q "//&subghz_protocol_${proto}," "$PROTO_ITEMS"; then
               sed -i -E "s|//(&subghz_protocol_${proto},)|\1|" "$PROTO_ITEMS"
               echo "  uncommented: ${proto}"

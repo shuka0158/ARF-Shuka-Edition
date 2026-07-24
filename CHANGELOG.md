@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+- Firmware still 865 KB (5 KB over 860 KB C2 boundary) after the previous 6-protocol
+  cut — removed 8 more standard protocols: Somfy Keytis/Telis (shutter/awning remotes,
+  not automotive — same category as the already-cut dooya/jarolift), plus niche
+  regional gate brands Bett, Clemsa, King Gates Stylo 4K, Magellan, Mastercode,
+  Phoenix V2 (low encounter rate, overlapping coverage from Princeton/gate_tx/CAME/Nice)
+
 ### Added
 - Toyota/Lexus RKE protocol (315/433 MHz, PWM, 72-bit rolling-code frame)
 - Nissan/Infiniti RKE protocol (315/433 MHz, PWM, 64-bit Keeloq-derived rolling code)
