@@ -119,6 +119,13 @@ jobs:
           done
           echo "Modified files applied"
 
+      - name: Apply verified PSA decoder fixes
+        run: |
+          # psa.c already exists in upstream ARF, so it can't go through
+          # modified_files/ (that would silently revert future upstream
+          # changes) — patch the two verified bugs in place instead.
+          python3 shuka-edition/scripts/patch_psa_decoder.py
+
       - name: Customize firmware branding
         run: |
           # Replace "ARF-Firmware" firmware name with "Shuka-ARF" in all source files
