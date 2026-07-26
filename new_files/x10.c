@@ -231,9 +231,12 @@ SubGhzProtocolStatus
     subghz_protocol_decoder_x10_deserialize(void* context, FlipperFormat* flipper_format) {
     furi_assert(context);
     SubGhzProtocolDecoderX10* instance = context;
-    bool ret = false;
+    SubGhzProtocolStatus ret = SubGhzProtocolStatusError;
     do {
-        if(!subghz_block_generic_deserialize(&instance->generic, flipper_format)) {
+        SubGhzProtocolStatus status =
+            subghz_block_generic_deserialize(&instance->generic, flipper_format);
+        if(status != SubGhzProtocolStatusOk) {
+            ret = status;
             break;
         }
         if(instance->generic.data_count_bit !=
@@ -241,7 +244,7 @@ SubGhzProtocolStatus
             FURI_LOG_E(TAG, "Wrong number of bits in key");
             break;
         }
-        ret = true;
+        ret = SubGhzProtocolStatusOk;
     } while(false);
     return ret;
 }

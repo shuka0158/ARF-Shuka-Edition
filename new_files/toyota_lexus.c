@@ -107,18 +107,19 @@ static uint8_t toyota_crc8(const uint8_t* data, size_t len) {
     return crc;
 }
 
-static uint8_t toyota_calculate_crc(uint64_t hi, uint8_t lo_byte) {
-    /* Frame bytes 0-7: [preamble(1)] [counter(2)] [serial(4)] [button(1)] [crc(1)]
-       CRC covers bytes 0-6 (all except the CRC byte itself). */
-    uint8_t buf[8];
-    buf[0] = (uint8_t)(hi >> 56);
-    buf[1] = (uint8_t)(hi >> 48);
-    buf[2] = (uint8_t)(hi >> 40);
-    buf[3] = (uint8_t)(hi >> 32);
-    buf[4] = (uint8_t)(hi >> 24);
-    buf[5] = (uint8_t)(hi >> 16);
-    buf[6] = (uint8_t)(hi >> 8);
-    buf[7] = lo_byte;
+static uint8_t toyota_calculate_crc(uint64_t hi) {
+    /* hi = d >> 8, i.e. [counter(2)][serial(4)][button(1)] packed in the low
+       56 bits. The preamble byte never survives reception (see comment in
+       toyota_extract_fields) and CRC is defined over bytes 1-7 (counter,
+       serial, button) to match what the encoder actually transmits. */
+    uint8_t buf[7];
+    buf[0] = (uint8_t)(hi >> 48);
+    buf[1] = (uint8_t)(hi >> 40);
+    buf[2] = (uint8_t)(hi >> 32);
+    buf[3] = (uint8_t)(hi >> 24);
+    buf[4] = (uint8_t)(hi >> 16);
+    buf[5] = (uint8_t)(hi >> 8);
+    buf[6] = (uint8_t)(hi & 0xFF);
     return toyota_crc8(buf, 7);
 }
 
@@ -131,8 +132,7 @@ static void toyota_extract_fields(SubGhzProtocolDecoderToyotaLexus* instance) {
     instance->generic.cnt = (uint16_t)((d >> 48) & 0xFFFF);
     instance->generic.btn = (uint8_t)((d >> 8) & 0xFF);
     instance->crc_received = (uint8_t)(d & 0xFF);
-    instance->crc_valid =
-        (instance->crc_received == toyota_calculate_crc(d >> 8, (uint8_t)(d & 0xFF)));
+    instance->crc_valid = (instance->crc_received == toyota_calculate_crc(d >> 8));
 }
 
 // ─── Encoder ────────────────────────────────────────────────────────────────
@@ -203,7 +203,10 @@ static bool toyota_encoder_get_upload(SubGhzProtocolEncoderToyotaLexus* instance
     frame[5] = (instance->generic.serial >> 8) & 0xFF;
     frame[6] = instance->generic.serial & 0xFF;
     frame[7] = btn;
-    frame[8] = toyota_crc8(frame, 8);
+    /* CRC covers bytes 1-7 (counter, serial, button) — matches
+       toyota_calculate_crc, which never sees the preamble byte since it
+       doesn't survive the 72-bit-into-64-bit-accumulator reception path. */
+    frame[8] = toyota_crc8(&frame[1], 7);
 
     size_t idx = 0;
     /* Preamble: 12 short pairs */
