@@ -9,7 +9,8 @@ Custom Flipper Zero firmware by **shuka0158**, built on top of [D4C1-Labs/Flippe
 
 # P.S.: 
 (I really do not own a car so i cannot test everything on my own, so if you have a vehicle wich is using one of my custom added protocols, i will be thankfull if someone can test them in real life and contact me if testing was succesefull, or debug problem, or if you can send me even small RAW file/capture from keyfob so i can analyze it.
-That will support this project very much. Thanks)
+That will support this project very much. Thanks).
+My Discord: @shuka0158
 
 
 
