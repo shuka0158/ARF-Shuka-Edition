@@ -421,6 +421,24 @@ jobs:
 
           rm -rf nsfw-anim-src
 
+      - name: Verify app/firmware API consistency
+        run: |
+          # Guard against the issue #8 failure mode: if the shipped .fap files were
+          # built for a different firmware API *major* than the firmware itself,
+          # every external app breaks at launch with "App Too Old"/"App Too New".
+          # Fail loud here rather than shipping a bundle where nothing but the
+          # built-in apps (Sub-GHz, Settings) works.
+          UPDATE_DIR=$(find flipper-fw/dist -maxdepth 3 -type d -name "*update*" \
+            | grep -v '\.dfu' | head -1)
+          RESOURCES_THS="$UPDATE_DIR/resources.ths"
+          API_CSV=flipper-fw/targets/f7/api_symbols.csv
+          if [ ! -f "$RESOURCES_THS" ]; then
+            echo "ERROR: resources.ths not found — cannot verify API consistency" >&2
+            exit 1
+          fi
+          pip3 install -q heatshrink2
+          python3 shuka-edition/scripts/check_api_consistency.py "$API_CSV" "$RESOURCES_THS"
+
       - name: Collect artifacts
         run: |
           mkdir -p artifacts

@@ -153,6 +153,22 @@ Use this if you just want to update the firmware binary without touching your SD
 
 ---
 
+## Troubleshooting
+
+### Apps show "App Too Old" / "Missing Imports" and freeze on launch
+
+Symptom: Sub-GHz and Settings work, but every other app (NFC, Infrared, RFID, GPIO, Bluetooth, and the rest) shows **"App Too Old"** or **"Missing Imports"** and the Flipper freezes on launch (soft-reset with **LEFT + BACK** to recover).
+
+Cause: this almost always means **the firmware didn't fully flash**, so the firmware on the device and the apps on the SD card are from different API generations. Sub-GHz and Settings keep working because they're built *into* the firmware, while every other menu entry is an external `.fap` plugin loaded from the SD card — and the plugin loader rejects any app whose API major version doesn't match the running firmware. Interrupted flashes, or flashing with a **third-party qFlipper fork** that crashes mid-write, are the usual culprits.
+
+How to confirm: connect the Flipper over USB, open the CLI, and run `device_info` (a built-in command, so it works even when external commands report "failed to load external command"). Check `firmware_api_major` — for a correctly installed build it must match the API this release ships (currently **89**). If it's higher, the firmware running on the device is not this build.
+
+Fix: reflash the **full firmware** with the **official** qFlipper (not a fork), or the web flasher, and **watch the Flipper's own screen show the update progress bar reach 100% before unplugging**. If the progress bar never completes, the firmware didn't change.
+
+> Every published release is checked in CI (`scripts/check_api_consistency.py`) to guarantee the firmware and the bundled apps share the same API major version, so a *correct* install never hits this.
+
+---
+
 ## Recovery (If Flipper is not responding / bricked)
 
 If your Flipper won't boot, isn't detected by qFlipper or `dfu-util`, and normal button combos don't work, use this sequence to force the STM32 hardware boot ROM into recovery mode — **no tools or case opening required**.
