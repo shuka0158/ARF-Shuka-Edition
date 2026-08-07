@@ -281,6 +281,18 @@ jobs:
           # harmless) — only removing it as a *candidate* to auto-detect.
           sed -i '/^    NfcProtocolMfDesfire,$/d' "$REPO/lib/nfc/protocols/nfc_protocol.c"
 
+          # lib/nfc's own SConscript explicitly lists every public header via
+          # File(...) (not a glob), for the firmware's SDK export table. This
+          # is the actual root cause of the "sdk_origin.i ... Source ...
+          # mf_desfire.h not found" build failure: unlike a glob, an explicit
+          # File() node doesn't just quietly stop matching when the file goes
+          # away — scons still expects it to exist and hard-fails resolving
+          # the build graph. Deleting api_symbols.csv's rows earlier does NOT
+          # fix this; that CSV is a separate cached snapshot, not what's read
+          # here.
+          sed -i '/File("protocols\/mf_desfire\/mf_desfire.h"),/d' "$REPO/lib/nfc/SConscript"
+          sed -i '/File("protocols\/mf_desfire\/mf_desfire_poller.h"),/d' "$REPO/lib/nfc/SConscript"
+
           python3 "$SHUKA/scripts/patch_type_4_tag_no_desfire.py" \
             "$REPO/lib/nfc/protocols/type_4_tag/type_4_tag_poller_i.c"
 
@@ -418,19 +430,6 @@ jobs:
       - name: Preset Dolphin XP to max level
         run: |
           python3 shuka-edition/scripts/patch_dolphin_level.py
-
-      - name: DIAGNOSTIC - verify DESFire removal state (temporary, issue #9)
-        run: |
-          echo "=== mf_desfire dir exists? ==="
-          ls -la flipper-fw/lib/nfc/protocols/mf_desfire 2>&1 || echo "(gone, as expected)"
-          echo "=== any remaining mf_desfire references anywhere in the tree? ==="
-          grep -rln "mf_desfire" flipper-fw --include="*.c" --include="*.h" --include="*.fam" \
-            --include="*.csv" --include="*.json" --include="*.scons" --include="SConscript" \
-            2>/dev/null || echo "(none found)"
-          echo "=== target.json sdk_header_paths ==="
-          cat flipper-fw/targets/f7/target.json | python3 -c "import json,sys; print(json.load(sys.stdin).get('sdk_header_paths'))"
-          echo "=== api_symbols.csv desfire count ==="
-          grep -ci desfire flipper-fw/targets/f7/api_symbols.csv || echo 0
 
       - name: Set up Python & fbt toolchain
         run: |
