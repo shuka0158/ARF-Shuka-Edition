@@ -149,7 +149,7 @@ Use this if you just want to update the firmware binary without touching your SD
 |---|---|
 | `flipper-z-f7-update-arf-shuka-edition.tgz` | **Full install** — firmware + Infrared, NFC, RFID, GPIO, Bad USB, U2F apps |
 | `flipper-z-f7-full-arf-shuka-edition.dfu` | Firmware binary only |
-| `ARF-Shuka-animations.zip` | Custom idle animations — copy to SD card manually if you want them |
+| `NSFW-Shuka-animations.zip` | NSFW idle animations — already included in the full install above; download separately only if you want to copy them to the SD card manually without flashing |
 
 ---
 

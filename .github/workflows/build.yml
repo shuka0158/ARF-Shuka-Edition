@@ -454,32 +454,20 @@ jobs:
           python3 -m pip install --upgrade pip
           pip3 install pyserial protobuf heatshrink2
 
-      - name: Embed custom animations into firmware resources
+      - name: Clear stock external animations (NSFW-only pack)
         run: |
-          pip3 install -q Pillow
           EXTERN=flipper-fw/assets/dolphin/external
 
-          # Remove ARF's stock external animations — only our 4 will remain
+          # Remove ARF's stock external animations entirely — this build ships
+          # no default/"safe" animation pack at all, only NSFW (injected into
+          # resources.ths post-build, see "Inject NSFW animations" below). Leave
+          # a minimal valid manifest so fbt's DolphinExtBuilder has something to
+          # pack (zero animations is a valid, empty pack) and so the later NSFW
+          # injection step finds a clean, empty base to add its entries to.
           rm -rf "${EXTERN:?}"/*
+          printf "Filetype: Flipper Animation Manifest\nVersion: 1\n" > "$EXTERN/manifest.txt"
 
-          # Generate directly into the dolphin external path fbt expects.
-          # DolphinExtBuilder packs this folder into resources.ths → deployed to
-          # /int/dolphin/ during OTA install, so no SD card required.
-          python3 shuka-edition/scripts/generate_animations.py "$EXTERN"
-
-          echo "Custom animations embedded:"
-          ls -la "$EXTERN/"
-          echo "Manifest:"
-          cat "$EXTERN/manifest.txt"
-
-          # Also zip for the GitHub Release — users can copy to SD card too
-          mkdir -p artifacts_anim
-          cp -r "$EXTERN/" artifacts_anim/ARF-Shuka-animations
-          (cd artifacts_anim && zip -r ARF-Shuka-animations.zip ARF-Shuka-animations/ -x "*.DS_Store")
-          echo "Animation SD pack built."
-        env:
-          PYTHONUNBUFFERED: "1"
-
+          echo "External animation pack cleared — NSFW-only, injected post-build."
 
 
       - name: Build firmware
@@ -683,8 +671,7 @@ jobs:
             find flipper-fw/dist -type d | sort
           fi
 
-          # Include animation packs
-          cp artifacts_anim/ARF-Shuka-animations.zip artifacts/ 2>/dev/null || true
+          # Include animation pack (NSFW-only — no "safe" pack is built anymore)
           cp artifacts_anim/NSFW-Shuka-animations.zip artifacts/ 2>/dev/null || true
           echo "=== artifacts/ ==="
           ls -lh artifacts/
