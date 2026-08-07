@@ -293,17 +293,24 @@ const NotificationSequence subghz_sequence_rx_locked_no_led = {
             }
             break;
         case SubGhzNotificationStateRxDone:
+            // Note: deliberately not a ternary here — subghz_sequence_rx and
+            // subghz_sequence_rx_no_led are arrays of different lengths, and
+            // &array decays to a length-specific pointer type in C, so a
+            // ternary between the two &-taken arrays fails to compile
+            // ("pointer type mismatch in conditional expression").
             if(!subghz_is_locked(subghz)) {
-                notification_message(
-                    subghz->notifications,
-                    subghz->last_settings->rx_led_indicator ? &subghz_sequence_rx :
-                                                                &subghz_sequence_rx_no_led);
+                if(subghz->last_settings->rx_led_indicator) {
+                    notification_message(subghz->notifications, &subghz_sequence_rx);
+                } else {
+                    notification_message(subghz->notifications, &subghz_sequence_rx_no_led);
+                }
             } else {
-                notification_message(
-                    subghz->notifications,
-                    subghz->last_settings->rx_led_indicator ?
-                        &subghz_sequence_rx_locked :
-                        &subghz_sequence_rx_locked_no_led);
+                if(subghz->last_settings->rx_led_indicator) {
+                    notification_message(subghz->notifications, &subghz_sequence_rx_locked);
+                } else {
+                    notification_message(
+                        subghz->notifications, &subghz_sequence_rx_locked_no_led);
+                }
             }
             subghz->state_notifications = SubGhzNotificationStateRx;
             break;
