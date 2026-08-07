@@ -315,12 +315,19 @@ class ByteStream {
   }
   async message() { return this.readN(await this.varint()); }
   // Parse an RPC response for a specific command_id starting at the current
-  // position. If start_rpc_session left a few bytes of CLI text/newline in
-  // the pipe before binary mode truly began, a length-prefixed parse at
-  // position 0 would misalign — so on any parse failure or command_id
-  // mismatch, rewind to one byte past where we started and retry, up to
-  // maxSkip bytes, instead of trusting the first parse blindly.
-  async syncMessage(expectedId, maxSkip=256) {
+  // position. Before start_rpc_session actually switches the pipe to binary
+  // mode, a decent amount of plain-text CLI output is sitting there unread:
+  // the ~900-byte ASCII-art MOTD banner printed once on connect
+  // (cli_main_motd, cli_main_shell.c), a "\r\n<name>>: " prompt reprint
+  // after our wake '\r', and — per cli_shell_line.c — every character of
+  // "start_rpc_session" gets echoed back individually wrapped in ANSI
+  // insert-mode escapes as we "type" it. That's roughly 1-1.2 KB of noise
+  // before the first real length-prefixed protobuf response begins, so a
+  // length-prefixed parse at position 0 would badly misalign — on any parse
+  // failure or command_id mismatch, rewind to one byte past where we
+  // started and retry, up to maxSkip bytes, instead of trusting a parse at
+  // the current position blindly.
+  async syncMessage(expectedId, maxSkip=4096) {
     for (let skipped = 0; skipped <= maxSkip; skipped++) {
       const save = this.pos;
       try {
