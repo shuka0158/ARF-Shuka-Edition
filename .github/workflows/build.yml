@@ -401,6 +401,29 @@ jobs:
           fi
           bash shuka-edition/scripts/check_size.sh "$DFU"
 
+      - name: Diagnose firmware size breakdown (issue #9)
+        if: always()
+        run: |
+          # One-off diagnostic while trimming for issue #9: which linked-in
+          # symbols/objects are actually the largest, so cuts can target real
+          # weight instead of guessing. Non-fatal — never fails the job.
+          set +e
+          ELF=$(find flipper-fw/build -maxdepth 2 -name "firmware.elf" 2>/dev/null | head -1)
+          NM=$(find / -xdev -name "arm-none-eabi-nm" 2>/dev/null | head -1)
+          SIZE_BIN=$(find / -xdev -name "arm-none-eabi-size" 2>/dev/null | head -1)
+          echo "ELF: $ELF"
+          echo "nm : $NM"
+          echo "size: $SIZE_BIN"
+          if [ -n "$ELF" ] && [ -n "$SIZE_BIN" ]; then
+            echo "=== Section sizes ==="
+            "$SIZE_BIN" -A "$ELF"
+          fi
+          if [ -n "$ELF" ] && [ -n "$NM" ]; then
+            echo "=== Top 60 largest symbols (.text + .rodata) ==="
+            "$NM" --print-size --size-sort -C "$ELF" 2>/dev/null | tail -60
+          fi
+          exit 0
+
       - name: Inject NSFW animations into firmware resources pack
         run: |
           # Clone the NSFW collection (shallow, no history needed)
