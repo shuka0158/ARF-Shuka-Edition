@@ -359,6 +359,22 @@ jobs:
           ./fbt COMPACT=1 DEBUG=0 \
             DIST_SUFFIX="arf-shuka-edition" \
             updater_package 2>&1 | tee build.log
+          FBT_STATUS="${PIPESTATUS[0]}"
+
+          # `find dist -name "*.dfu"` alone is not a reliable success signal: an
+          # earlier, unrelated build stage can leave a .dfu on disk even when the
+          # actual `dist_updater_package` target (which assembles the real OTA
+          # bundle — firmware.dfu + resources.ths + update.fuf) fails partway
+          # through. This bit us for real: fbt's own memory-layout guard
+          # ("Firmware image overlaps C2 region and is not programmable!") was
+          # failing on every build without anyone noticing, because this step
+          # only checked for *a* .dfu file rather than the actual exit status of
+          # the fbt invocation that was supposed to build the whole package.
+          if [ "$FBT_STATUS" -ne 0 ] || grep -q "FBT ERRORS" build.log; then
+            echo "Build FAILED — fbt exited $FBT_STATUS or reported FBT ERRORS" >&2
+            tail -60 build.log >&2
+            exit 1
+          fi
 
           if find dist -name "*.dfu" | grep -q .; then
             echo "Build OK — .dfu produced"

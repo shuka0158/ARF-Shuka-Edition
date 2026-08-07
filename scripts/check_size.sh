@@ -1,13 +1,31 @@
 #!/usr/bin/env bash
 # check_size.sh — abort if the built DFU exceeds the STM32WB C2 boundary.
 # Usage: check_size.sh <path/to/firmware.dfu>
-# fbt itself enforces the C2 overlap check; 858 KB is where it starts failing.
-# Hard limit here mirrors fbt's threshold; warn 10 KB before.
+#
+# fbt's own updater_package step (scripts/update.py: layout_check()) is the
+# authoritative check — it compares the firmware size against the *actual*
+# load address baked into the currently-bundled radio (BLE coprocessor)
+# binary's signed metadata, and refuses to package (Error 2, "Firmware image
+# overlaps C2 region and is not programmable!") if firmware runs into it.
+#
+# This script is a cheap, early proxy for that check so a bloated build fails
+# fast instead of burning a full ~8-minute build. It previously hardcoded
+# 860 KB, which was wrong: as of the radio stack currently pinned by this
+# project's fbt config, the real boundary (from the build log's "Using
+# guessed radio address 0x080CE000") is 0x080CE000 - 0x08000000 = 824 KB
+# exactly, with zero required margin (fbt's own MIN_GAP_PAGES is 0). That
+# 36 KB miscalibration meant this script was reporting "OK"/"WARN" on builds
+# that fbt was silently failing to package on every single release.
+#
+# This is a proxy, not a substitute: the real gate is the "Build firmware"
+# step now checking fbt's actual exit status. If the bundled radio stack ever
+# changes, this number can drift again — watch for "Using guessed radio
+# address 0x...." in the build log and recompute (address - 0x08000000).
 
 set -euo pipefail
 
-WARN_LIMIT=$((855 * 1024))   # 875 520 — 5 KB before observed C2 boundary
-HARD_LIMIT=$((860 * 1024))   # 880 640 — fbt C2 overlap threshold (fails between 859-861 KB)
+WARN_LIMIT=$((810 * 1024))   # 829 440 — leave real headroom, not just scrape by
+HARD_LIMIT=$((824 * 1024))   # 843 776 — actual radio load address (0x080CE000) minus flash base
 
 if [[ $# -lt 1 ]]; then
     echo "Usage: $0 <firmware.dfu>"
@@ -29,17 +47,17 @@ HEADROOM_KB=$(( HEADROOM / 1024 ))
 echo "=== Firmware size check ==="
 echo "File  : $DFU"
 echo "Size  : ${SIZE_KB} KB  (${SIZE} bytes)"
-echo "Limit : 860 KB  (${HARD_LIMIT} bytes)"
+echo "Limit : 824 KB  (${HARD_LIMIT} bytes) — real radio load address minus flash base, not a round-number guess"
 echo "Margin: ${HEADROOM_KB} KB"
 
 if [[ $SIZE -gt $HARD_LIMIT ]]; then
     echo ""
-    echo "FAIL: firmware exceeds 860 KB C2 boundary by $(( SIZE - HARD_LIMIT )) bytes."
+    echo "FAIL: firmware exceeds the 824 KB C2 boundary by $(( SIZE - HARD_LIMIT )) bytes."
     echo "fbt will refuse to package OTA — reduce protocol count or strip unused apps."
     exit 1
 elif [[ $SIZE -gt $WARN_LIMIT ]]; then
     echo ""
-    echo "WARN: firmware is within 5 KB of the 860 KB C2 boundary. Consider trimming."
+    echo "WARN: only ${HEADROOM_KB} KB of margin before the 824 KB C2 boundary. Consider trimming."
 else
     echo ""
     echo "OK: firmware size is within limits."
