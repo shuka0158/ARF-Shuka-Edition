@@ -284,15 +284,21 @@ function frame(m)  { return cat(varint(m.length), m); }
 //  BYTE-LEVEL SERIAL READER
 // ═══════════════════════════════════════════════════════════════
 class ByteStream {
-  constructor(readable) { this.r=readable.getReader(); this.q=[]; }
-  async byte() {
-    while(!this.q.length) {
-      const {value,done}=await this.r.read();
-      if(done) throw new Error('Port closed');
-      for(const b of value) this.q.push(b);
+  // Indexed buffer + cursor (not a shift-per-byte queue) so syncMessage()
+  // below can rewind and retry byte-by-byte without ever touching the
+  // underlying reader — a past attempt at this (commit 5b1e25d) called
+  // reader.cancel() to discard leftover bytes, which itself stops Chrome
+  // from queuing further USB IN transfers and was blamed for a later hang
+  // (bddcc73). Never cancel the reader; just don't trust position 0.
+  constructor(readable) { this.r=readable.getReader(); this.buf=[]; this.pos=0; }
+  async _ensure(n) {
+    while (this.buf.length - this.pos < n) {
+      const {value,done} = await this.r.read();
+      if (done) throw new Error('Port closed');
+      for (const b of value) this.buf.push(b);
     }
-    return this.q.shift();
   }
+  async byte() { await this._ensure(1); return this.buf[this.pos++]; }
   async varint() {
     let n=0, s=0;
     while(true) {
@@ -302,11 +308,36 @@ class ByteStream {
     }
   }
   async readN(n) {
-    const o=new Uint8Array(n);
-    for(let i=0;i<n;i++) o[i]=await this.byte();
+    await this._ensure(n);
+    const o = new Uint8Array(this.buf.slice(this.pos, this.pos+n));
+    this.pos += n;
     return o;
   }
   async message() { return this.readN(await this.varint()); }
+  // Parse an RPC response for a specific command_id starting at the current
+  // position. If start_rpc_session left a few bytes of CLI text/newline in
+  // the pipe before binary mode truly began, a length-prefixed parse at
+  // position 0 would misalign — so on any parse failure or command_id
+  // mismatch, rewind to one byte past where we started and retry, up to
+  // maxSkip bytes, instead of trusting the first parse blindly.
+  async syncMessage(expectedId, maxSkip=256) {
+    for (let skipped = 0; skipped <= maxSkip; skipped++) {
+      const save = this.pos;
+      try {
+        const len = await this.varint();
+        if (len > 0 && len < 8192) {
+          const msg = await this.readN(len);
+          const fields = pbDecode(msg);
+          if (fields[1]?.type === 'varint' && fields[1].val === expectedId) {
+            if (skipped) console.warn(`RPC resync: skipped ${skipped} stray byte(s) before command ${expectedId}'s response`);
+            return fields;
+          }
+        }
+      } catch (e) { /* not a valid frame here — fall through to skip */ }
+      this.pos = save + 1;
+    }
+    throw new Error(`RPC resync failed — no response for command ${expectedId} found`);
+  }
   cancel() { try{this.r.cancel();}catch{} }
 }
 
@@ -373,17 +404,12 @@ class FlipperRPC {
       }, 15000));
       try {
         await Promise.race([this.writer.write(sub), tmo]);
-        // Reproduced 3x on real hardware: writes reliably stall after
-        // exactly 3 packets (192 bytes) regardless of what data is in
-        // them (confirmed byte-for-byte — not a poison byte, it's purely
-        // positional). writer.write() resolving only means the data was
-        // queued somewhere in the stack (OS/Chrome/USB layer), not that
-        // the Flipper has actually received and processed it — so this
-        // loop can queue faster than the real hardware drains, until
-        // whatever fixed-depth buffer sits in between (kernel URB queue,
-        // Chrome's own buffering, or the STM32's USB FIFO) fills up.
-        // Pace it explicitly rather than trusting write() to reflect real
-        // hardware progress.
+        // NOTE: every "stall at exactly byte 192" seen in this file's history
+        // was NOT a write-pacing problem (confirmed against firmware source —
+        // see mkdir()'s comment for the real cause: an unread RPC response
+        // deadlocking the Flipper's single CLI/RPC thread, which then stops
+        // draining its 192-byte USB RX ring buffer). This small delay is just
+        // a harmless courtesy margin, not what fixes the transfer.
         await this._delay(4);
       } catch (err) {
         if (timedOut) {
@@ -405,39 +431,51 @@ class FlipperRPC {
   }
   _delay(ms) { return new Promise(r=>setTimeout(r,ms)); }
 
-  async _rpc(msg) {
+  async _rpc(msg, id) {
     await this._send(frame(msg));
-    const resp = await this.bs.message();
-    const fields = pbDecode(resp);
+    const fields = await this.bs.syncMessage(id);
     const status = fields[2]?.val ?? 0;
     if (status !== 0) throw new Error(`RPC error ${status}`);
     return fields;
   }
 
-  // Create directory — fire-and-forget; we never read the response because
-  // stale CLI echo bytes in the ReadableStream corrupt any bs.message() parse.
-  // We don't need the ACK: "already exists" is fine, and write errors surface
-  // when the first writeFile chunk fails to open the file.
+  // Create directory, and actually wait for + read its response.
+  //
+  // Verified against the real firmware source (applications/services/rpc/
+  // rpc_storage.c, rpc_system_storage_mkdir_process — dev-56701a81, the
+  // exact tag this repo builds): a StorageMkdirRequest ALWAYS gets exactly
+  // one response, unconditionally. Previously this was fire-and-forget —
+  // that response was sent by the device and then never read by us.
+  //
+  // Why that mattered (also verified against source, cli_vcp.c): the
+  // Flipper's CLI/RPC pipe is a hardcoded 192-byte ring buffer in EACH
+  // direction (VCP_BUF_SIZE = USB_CDC_PKT_LEN*3 = 64*3 = 192 — the exact,
+  // no-coincidence byte offset every stall in this file has happened at).
+  // A single thread (rpc_cli_command_start_session) both reads incoming
+  // bytes off the RX pipe *and* synchronously runs request handlers, which
+  // synchronously send responses into the TX pipe. If nobody ever drains
+  // that TX pipe (i.e. we never read from the port), the thread blocks
+  // trying to send mkdir's unread response, and — because it's the same
+  // thread — stops reading incoming bytes too. The RX pipe then fills at
+  // exactly 192 bytes and the device NAKs, which is what actually produced
+  // every "USB timeout at byte 192" error, regardless of write pacing.
   async mkdir(path) {
     log(`mkdir ${path}`, 'di');
+    const id = this.cmdId++;
     const req = pbL(1, path);
-    const msg = cat(pbV(1,this.cmdId++), pbV(3,0), pbL(13, req));
-    await this._send(frame(msg));
-    // Defensive margin: the one real-world failure seen so far (a stalled
-    // write causing a device freeze, see _send()'s abort() comment) hit on
-    // the very first writeFile chunk immediately after this call, which is
-    // consistent with the Flipper still being busy with this SD write when
-    // the next message arrived. Not confirmed as the root cause, but a
-    // longer buffer here is cheap and plausible insurance either way.
-    await this._delay(600); // let Flipper finish the directory SD write
+    const msg = cat(pbV(1,id), pbV(3,0), pbL(13, req));
+    await this._rpc(msg, id);
   }
 
-  // Upload a file in chunks — fully fire-and-forget.  We never read ACKs
-  // because stale CLI echo bytes in the ReadableStream corrupt bs.message()
-  // parsing.  Natural USB CDC flow control handles pacing: writer.write()
-  // blocks (Flipper NAKs) when the Flipper's RX ring buffer is full while it
-  // is doing SD card writes, then unblocks when the SD write completes and the
-  // RPC task drains the buffer.  A 120 s per-packet timeout is the safety net.
+  // Upload a file in chunks.
+  //
+  // Verified against the real firmware source (rpc_storage.c,
+  // rpc_system_storage_write_process): `send_response = !request->has_next`
+  // — intermediate chunks (has_next=1) get NO response at all, only the
+  // final chunk (has_next=0) does. So intermediate chunks stay fire-and-
+  // forget (awaiting a response that will never arrive would hang forever),
+  // but the final chunk's response — like mkdir's — must actually be read,
+  // for the same TX-pipe-backpressure reason documented on mkdir() above.
   async writeFile(path, data, onProgress) {
     const shortName = path.split('/').pop();
     const totalKB = (data.length/1024).toFixed(1);
@@ -457,7 +495,11 @@ class FlipperRPC {
       if (isFirst) req = cat(pbL(1, path), fileMsg);
       const msg = cat(pbV(1, id), pbV(3, hasNext ? 1 : 0), pbL(11, req));
 
-      await this._send(frame(msg));
+      if (hasNext) {
+        await this._send(frame(msg));
+      } else {
+        await this._rpc(msg, id);
+      }
 
       sent += slice.length;
       const pct = sent/total;
@@ -480,11 +522,12 @@ class FlipperRPC {
   async triggerUpdate(manifestPath) {
     log(`Triggering OTA: ${manifestPath}`, 'or');
     // system_update_request = field 41
+    const id = this.cmdId++;
     const req = pbL(1, manifestPath);   // UpdateRequest.update_manifest
-    const msg = cat(pbV(1,this.cmdId++), pbV(3,0), pbL(41, req));
+    const msg = cat(pbV(1,id), pbV(3,0), pbL(41, req));
     // Flipper reboots so response may not arrive — send and don't wait long
     try {
-      await Promise.race([this._rpc(msg), this._delay(2000)]);
+      await Promise.race([this._rpc(msg, id), this._delay(2000)]);
     } catch { /* Flipper rebooted — expected */ }
   }
 
