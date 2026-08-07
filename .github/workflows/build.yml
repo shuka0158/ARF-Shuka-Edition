@@ -386,7 +386,13 @@ jobs:
           fi
 
       - name: Check firmware size
+        if: always()
         run: |
+          # Runs even if "Build firmware" failed the fbt-exit-status gate (e.g. the
+          # C2-overlap packaging error from issue #9): fbt writes firmware.dfu
+          # before that later packaging step runs, so the number is available and
+          # worth surfacing immediately rather than waiting on a full green run to
+          # find out how close (or how far) a size-trim iteration actually got.
           DFU=$(find flipper-fw/dist -name "flipper-z-f7-full-*.dfu" 2>/dev/null | head -1)
           if [ -z "$DFU" ]; then
             echo "ERROR: main firmware DFU (flipper-z-f7-full-*.dfu) not found in dist/" >&2
