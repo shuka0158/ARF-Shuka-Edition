@@ -366,8 +366,29 @@ class FlipperRPC {
     const PKT = 64;
     for (let i = 0; i < bytes.length; i += PKT) {
       const sub = bytes.subarray(i, i + PKT);
-      const tmo = new Promise((_,rej)=>setTimeout(()=>rej(new Error(`USB timeout at byte ${i}/${bytes.length}`)),120000));
-      await Promise.race([this.writer.write(sub), tmo]);
+      let timedOut = false;
+      const tmo = new Promise((_,rej)=>setTimeout(()=>{
+        timedOut = true;
+        rej(new Error(`USB timeout at byte ${i}/${bytes.length}`));
+      }, 15000));
+      try {
+        await Promise.race([this.writer.write(sub), tmo]);
+      } catch (err) {
+        if (timedOut) {
+          // Promise.race does NOT cancel the losing side — the real
+          // writer.write() call stays pending forever even after we give
+          // up on it. Because a WritableStreamDefaultWriter processes
+          // writes strictly in order, that dangling write then blocks
+          // every write after it, including our own close()/port.close()
+          // cleanup in the catch block below doFlash() — so the port (and
+          // the Flipper's USB endpoint, left mid-transfer) never actually
+          // gets released. This is what turned one slow packet into a
+          // full device freeze requiring a manual reset. abort() forcibly
+          // errors the stream so nothing is left dangling.
+          try { await this.writer.abort(err); } catch {}
+        }
+        throw err;
+      }
     }
   }
   _delay(ms) { return new Promise(r=>setTimeout(r,ms)); }
@@ -390,7 +411,13 @@ class FlipperRPC {
     const req = pbL(1, path);
     const msg = cat(pbV(1,this.cmdId++), pbV(3,0), pbL(13, req));
     await this._send(frame(msg));
-    await this._delay(300); // let Flipper finish the directory SD write
+    // Defensive margin: the one real-world failure seen so far (a stalled
+    // write causing a device freeze, see _send()'s abort() comment) hit on
+    // the very first writeFile chunk immediately after this call, which is
+    // consistent with the Flipper still being busy with this SD write when
+    // the next message arrived. Not confirmed as the root cause, but a
+    // longer buffer here is cheap and plausible insurance either way.
+    await this._delay(600); // let Flipper finish the directory SD write
   }
 
   // Upload a file in chunks — fully fire-and-forget.  We never read ACKs
