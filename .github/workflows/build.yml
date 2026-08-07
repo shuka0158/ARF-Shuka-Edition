@@ -207,17 +207,18 @@ jobs:
           #   bett, clemsa, kinggates_stylo_4k, magellan, mastercode, phoenix_v2 —
           #     niche regional gate brands with low real-world encounter rate,
           #     overlapping coverage from princeton/gate_tx/came/nice generics
+          # Round 3 cut (issue #9 — real C2 boundary is 824 KB, not 860 KB; still
+          #   ~32 KB over): drop the rest of the generic garage/gate/alarm batch
+          #   this step re-enables — alutech_at_4n, faac_slh, gate_tx, holtek,
+          #   honeywell (wireless alarm sensor, not automotive at all), hormann,
+          #   linear/linear_delta3, marantec, megacode, secplus_v1/v2, smc5326.
+          #   Kept: princeton, came/came_atomo/came_twee, nice_flo/nice_flor_s —
+          #   widest real-world gate/garage coverage per KB of the batch — plus
+          #   toyota, which is automotive.
           for proto in \
-            alutech_at_4n \
             came came_atomo came_twee \
-            faac_slh gate_tx \
-            holtek \
-            honeywell hormann \
-            linear linear_delta3 \
-            marantec megacode \
             nice_flo nice_flor_s \
             princeton \
-            secplus_v1 secplus_v2 smc5326 \
             toyota; do
             if grep -q "//&subghz_protocol_${proto}," "$PROTO_ITEMS"; then
               sed -i -E "s|//(&subghz_protocol_${proto},)|\1|" "$PROTO_ITEMS"
