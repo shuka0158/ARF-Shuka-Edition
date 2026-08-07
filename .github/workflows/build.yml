@@ -426,44 +426,7 @@ jobs:
             echo "=== Totals by subsystem prefix (sum of every matching symbol's size) ==="
             "$NM" --print-size --size-sort -C "$ELF" 2>/dev/null > /tmp/nm_full.txt
             wc -l /tmp/nm_full.txt
-            python3 - <<'PYEOF'
-import re
-from collections import defaultdict
-
-prefixes = [
-    "subghz_protocol_", "subghz_", "archive_", "mf_classic_", "mf_desfire_",
-    "mf_ultralight_", "nfc_", "felica_", "emv_", "lfrfid_", "ibutton_",
-    "infrared_", "irda_", "u8g2_", "desktop_", "notification_", "storage_",
-    "furi_", "mbedtls_", "bt_", "ble_", "power_", "gui_", "dialog_",
-    "elements_", "loader_", "system_settings", "badusb_", "u2f_",
-    "bad_usb", "js_", "scene_manager", "text_input", "byte_input",
-]
-totals = defaultdict(int)
-counts = defaultdict(int)
-matched_names = set()
-with open("/tmp/nm_full.txt") as f:
-    for line in f:
-        parts = line.split()
-        if len(parts) < 4:
-            continue
-        addr, size, typ, name = parts[0], parts[1], parts[2], " ".join(parts[3:])
-        try:
-            size = int(size, 16)
-        except ValueError:
-            continue
-        for p in sorted(prefixes, key=len, reverse=True):
-            if name.startswith(p):
-                totals[p] += size
-                counts[p] += 1
-                matched_names.add(name)
-                break
-
-for p, total in sorted(totals.items(), key=lambda kv: -kv[1]):
-    print(f"{p:<20} {total:>8} bytes  ({total/1024:6.2f} KB)  across {counts[p]:>4} symbols")
-
-grand = sum(totals.values())
-print(f"\nSum of all matched prefixes: {grand} bytes ({grand/1024:.2f} KB)")
-PYEOF
+            python3 shuka-edition/scripts/nm_prefix_totals.py /tmp/nm_full.txt
           fi
           exit 0
 
