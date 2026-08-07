@@ -415,6 +415,14 @@ jobs:
 
           echo "All Shuka-Edition protocols added OK"
 
+      - name: Add SubGHz RX LED toggle
+        run: |
+          # Lets the user disable the LED indicator while in SubGHz Read
+          # mode (covert reads / battery save) without touching the vibro,
+          # beep, or backlight feedback on a captured signal. Defaults ON —
+          # existing behavior is unchanged unless the user opts out.
+          python3 shuka-edition/scripts/patch_subghz_rx_led_toggle.py flipper-fw
+
       - name: Apply custom boot splash
         run: |
           REPO=flipper-fw
