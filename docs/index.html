@@ -373,6 +373,18 @@ class FlipperRPC {
       }, 15000));
       try {
         await Promise.race([this.writer.write(sub), tmo]);
+        // Reproduced 3x on real hardware: writes reliably stall after
+        // exactly 3 packets (192 bytes) regardless of what data is in
+        // them (confirmed byte-for-byte — not a poison byte, it's purely
+        // positional). writer.write() resolving only means the data was
+        // queued somewhere in the stack (OS/Chrome/USB layer), not that
+        // the Flipper has actually received and processed it — so this
+        // loop can queue faster than the real hardware drains, until
+        // whatever fixed-depth buffer sits in between (kernel URB queue,
+        // Chrome's own buffering, or the STM32's USB FIFO) fills up.
+        // Pace it explicitly rather than trusting write() to reflect real
+        // hardware progress.
+        await this._delay(4);
       } catch (err) {
         if (timedOut) {
           // Promise.race does NOT cancel the losing side — the real
