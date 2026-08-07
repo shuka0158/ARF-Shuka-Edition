@@ -171,6 +171,26 @@ static NfcCommand
         ],
     )
 
+    # ── metroflip_scene_parse.c: dead reference to is_desfire_locked() ──
+    # (declared in the now-deleted desfire.h; app->is_desfire is always false
+    # now — nothing ever sets it true — so the clause was already logically
+    # dead, this just makes it compile again.)
+    patch_file(
+        root / "scenes" / "metroflip_scene_parse.c",
+        [
+            (
+                '''    if(!app->card_type || (app->card_type[0] == '\\0') ||
+       (strcmp(app->card_type, "unknown") == 0) ||
+       (strcmp(app->card_type, "Unknown Card") == 0) ||
+       (app->is_desfire && is_desfire_locked(app->card_type))) {''',
+                '''    if(!app->card_type || (app->card_type[0] == '\\0') ||
+       (strcmp(app->card_type, "unknown") == 0) ||
+       (strcmp(app->card_type, "Unknown Card") == 0)) {''',
+                "metroflip_scene_parse.c dead is_desfire_locked call",
+            ),
+        ],
+    )
+
 
 if __name__ == "__main__":
     main()
