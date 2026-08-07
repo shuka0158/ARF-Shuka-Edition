@@ -423,6 +423,14 @@ jobs:
           # existing behavior is unchanged unless the user opts out.
           python3 shuka-edition/scripts/patch_subghz_rx_led_toggle.py flipper-fw
 
+      - name: Remove vgm_console (bundled FlipperHTTP networking)
+        run: |
+          # video_game_module_console is fully self-contained (own directory,
+          # own App() entry, nothing else references it or its bundled
+          # flipper_http.c/h helper) — plain rm -rf is sufficient, no
+          # registry/menu list to edit elsewhere.
+          rm -rf flipper-fw/applications/system/vgm_console
+
       - name: Apply custom boot splash
         run: |
           REPO=flipper-fw
