@@ -686,11 +686,20 @@ async function doFlash() {
       return;
     }
 
-    try {
-      await port.open({ baudRate:115200, flowControl:'hardware' });
-    } catch (e) {
-      await port.open({ baudRate:115200 });
-    }
+    // Flipper's USB port is a CDC-ACM virtual serial port — those don't
+    // implement real RTS/CTS hardware flow control. Requesting
+    // flowControl:'hardware' here doesn't throw (the OS/driver accepts the
+    // mode request), but writes can then silently stall waiting for a CTS
+    // signal the device never sends, which look exactly like "Flipper did
+    // not acknowledge start_rpc_session" — a bug, not a device problem.
+    // Every plain-CLI interaction with this device works reliably with no
+    // flow control at all, so don't request it.
+    // 230400, not 115200 — the actual rate the Flipper CLI/RPC UART runs at.
+    // Wrong rate is a second, independent cause of the same symptom this
+    // block already documents (flowControl:'hardware'): USB CDC-ACM ports
+    // don't error on an accepted-but-mismatched baud rate, so this failed
+    // silently as the same "did not acknowledge start_rpc_session".
+    await port.open({ baudRate:230400 });
     await port.setSignals({ dataTerminalReady:true, requestToSend:true });
     serialWriter = port.writable.getWriter();
     serialReader = port.readable.getReader();
