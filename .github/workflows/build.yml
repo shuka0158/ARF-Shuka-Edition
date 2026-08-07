@@ -423,18 +423,6 @@ jobs:
           # existing behavior is unchanged unless the user opts out.
           python3 shuka-edition/scripts/patch_subghz_rx_led_toggle.py flipper-fw
 
-      - name: TEMP — external CC1101 detection debug logging (remove once diagnosed)
-        run: |
-          # Diagnostic-only: external CC1101 detected fine on stock Unleashed
-          # with identical wiring, but not here, despite every layer of source
-          # between the two firmwares (driver, SPI pin config, GPIO init table,
-          # bus clock gating, device registry, power-on wrapper, OTG control)
-          # checked byte-identical. This adds a distinct log line at each
-          # possible failure point inside the device's own self-test so the
-          # real cause can be read straight off the device instead of guessed
-          # at externally. Revert once the cause is found.
-          python3 shuka-edition/scripts/patch_cc1101_ext_debug.py flipper-fw
-
       - name: Remove vgm_console (bundled FlipperHTTP networking)
         run: |
           # video_game_module_console is fully self-contained (own directory,
