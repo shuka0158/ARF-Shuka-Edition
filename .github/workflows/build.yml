@@ -253,6 +253,15 @@ jobs:
           REPO=flipper-fw
           SHUKA=shuka-edition
 
+          # SDK public-API export table (the same file issue #8's CI guard
+          # reads): scons cross-checks every `Header,+,<path>` row against a
+          # real file on disk independent of whether anything still
+          # #includes it, so a deleted-but-still-listed header is a hard
+          # build failure ("Source ... not found"), not just dead metadata.
+          # Also drop the exported mf_desfire_* functions/variable — leaving
+          # them would export symbols for a library that no longer exists.
+          sed -i '/desfire/Id' "$REPO/targets/f7/api_symbols.csv"
+
           # ── Core protocol library ──
           rm -rf "$REPO/lib/nfc/protocols/mf_desfire"
 
