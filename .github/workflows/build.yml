@@ -419,6 +419,19 @@ jobs:
         run: |
           python3 shuka-edition/scripts/patch_dolphin_level.py
 
+      - name: DIAGNOSTIC - verify DESFire removal state (temporary, issue #9)
+        run: |
+          echo "=== mf_desfire dir exists? ==="
+          ls -la flipper-fw/lib/nfc/protocols/mf_desfire 2>&1 || echo "(gone, as expected)"
+          echo "=== any remaining mf_desfire references anywhere in the tree? ==="
+          grep -rln "mf_desfire" flipper-fw --include="*.c" --include="*.h" --include="*.fam" \
+            --include="*.csv" --include="*.json" --include="*.scons" --include="SConscript" \
+            2>/dev/null || echo "(none found)"
+          echo "=== target.json sdk_header_paths ==="
+          cat flipper-fw/targets/f7/target.json | python3 -c "import json,sys; print(json.load(sys.stdin).get('sdk_header_paths'))"
+          echo "=== api_symbols.csv desfire count ==="
+          grep -ci desfire flipper-fw/targets/f7/api_symbols.csv || echo 0
+
       - name: Set up Python & fbt toolchain
         run: |
           sudo apt-get install -y python3-pip scons gcc-arm-none-eabi
