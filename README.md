@@ -13,6 +13,8 @@ That will support this project very much. Thanks).
 {and/or if you have any ideas how to change/improve this firmware, then DM me.}
 My Discord: @shuka0158
 
+
+
 (I live in UTC+4 Timezone, so please ensure that you are not messeging me at 2AM. ;D )
 
 
