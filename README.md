@@ -223,7 +223,7 @@ CI does this automatically on every push — see [`.github/workflows/build.yml`]
 
 The STM32WB55 C2 (Bluetooth coprocessor) flash boundary is **not** a round number — it's the load address baked into whatever radio stack binary is currently bundled (visible in a build log as `Using guessed radio address 0x...`). For the radio stack this project currently pins, that's `0x080CE000`, i.e. **824 KB** from flash base, with zero margin required (`fbt`'s own check accepts a gap of exactly 0 pages, but leaving a few KB of headroom is safer in case the pinned radio stack ever changes).
 
-⚠️ **As of 2026-08-07, ARF-Shuka-Edition's build is ~856 KB — about 32 KB over that boundary.** `fbt`'s own packaging step (`dist_updater_package`) fails on every build as a result ("Firmware image overlaps C2 region and is not programmable!"), which CI failed to surface for a while (see [issue #8](https://github.com/shuka0158/ARF-Shuka-Edition/issues/8) follow-up) because the old success check only looked for *a* `.dfu` file rather than the real fbt exit status. That's now fixed — CI fails loudly on this — but the firmware itself still needs real trimming (more protocols/apps cut) before a release build is safe to flash. Don't flash a release published before this was corrected without first confirming (via a fresh CI run) that `dist_updater_package` actually completed cleanly.
+
 
 ---
 
