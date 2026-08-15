@@ -382,6 +382,12 @@ jobs:
           rm -rf "$NFC/helpers/protocol_support/emv"
           rm -f "$NFC/scenes/nfc_scene_emv_transactions.c"
           rm -f "$NFC/helpers/nfc_emv_parser.c" "$NFC/helpers/nfc_emv_parser.h"
+          # nfc_app_i.h is a core internal header pulled in broadly across
+          # the NFC app — including by unrelated card-parser plugins like
+          # saflok, which don't touch EMV themselves but still transitively
+          # needed this include. First build without this line missed it:
+          #   fatal error: helpers/nfc_emv_parser.h: No such file or directory
+          sed -i '/#include "helpers\/nfc_emv_parser.h"/d' "$NFC/nfc_app_i.h"
           rm -f "$NFC/plugins/supported_cards/emv.c"
 
           sed -i '/ADD_SCENE(nfc, emv_transactions, EmvTransactions)/d' "$NFC/scenes/nfc_scene_config.h"
