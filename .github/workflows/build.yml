@@ -473,6 +473,18 @@ jobs:
       - name: Build firmware
         run: |
           cd flipper-fw
+
+          # DIST_SUFFIX below is passed twice on purpose. As an fbt/SCons
+          # command-line variable it only feeds the update-bundle directory
+          # name (f7-update-${DIST_SUFFIX}, per SConstruct's
+          # UPDATE_BUNDLE_DIR) — SCons does NOT forward command-line vars to
+          # subprocess env automatically. scripts/version.py (invoked by fbt
+          # as a plain subprocess to stamp firmware_version) reads the *OS*
+          # env var of the same name instead (`os.environ.get("DIST_SUFFIX")`
+          # or "unknown"), so without this export every build reported
+          # firmware_version as literally "unknown" — which is what made
+          # lab.flipper.net's app catalog flag the firmware as outdated.
+          export DIST_SUFFIX="arf-shuka-edition"
           ./fbt COMPACT=1 DEBUG=0 \
             DIST_SUFFIX="arf-shuka-edition" \
             updater_package 2>&1 | tee build.log
