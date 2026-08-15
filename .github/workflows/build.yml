@@ -423,6 +423,37 @@ jobs:
           # existing behavior is unchanged unless the user opts out.
           python3 shuka-edition/scripts/patch_subghz_rx_led_toggle.py flipper-fw
 
+      - name: Add one_wire library (required by Unitemp's DS18B20 support)
+        run: |
+          # ARF removed lib/one_wire entirely (dir absent, not just
+          # commented out of lib/SConscript's BuildModules list) — confirmed
+          # by grepping a fresh ARF checkout, zero hits. Unitemp's GPIO
+          # helper unconditionally #includes <one_wire/one_wire_host.h>
+          # (used for DS18B20 support), so without this the very first
+          # build after adding Unitemp fails outright:
+          #   fatal error: one_wire/one_wire_host.h: No such file or directory
+          # Same fix pattern as the "Add missing apps" step above: pull the
+          # small, self-contained library straight from official firmware.
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/flipperdevices/flipperzero-firmware.git flipper-official-lib
+          cd flipper-official-lib
+          git sparse-checkout set lib/one_wire
+          cd ..
+          cp -r flipper-official-lib/lib/one_wire flipper-fw/lib/one_wire
+          rm -rf flipper-official-lib
+
+          # Register it so fbt actually compiles it — BuildModules is an
+          # explicit list, not a directory scan.
+          if ! grep -q '"one_wire"' flipper-fw/lib/SConscript; then
+            sed -i 's/"digital_signal",/"digital_signal",\n        "one_wire",/' \
+              flipper-fw/lib/SConscript
+          fi
+          grep -q '"one_wire"' flipper-fw/lib/SConscript || {
+            echo "ERROR: failed to register one_wire in lib/SConscript — ARF changed its layout" >&2
+            exit 1
+          }
+          echo "one_wire library added and registered"
+
       - name: Add Unitemp GPIO temperature sensor app
         run: |
           # lab.flipper.net's catalog refuses installs onto this firmware —
