@@ -184,18 +184,15 @@ jobs:
             echo "Stripped: $proto"
           done
 
-          # Round 4 cut (issue #9 flash budget): Kia alone shipped 7 active
-          # protocol variants (kia_v0..kia_v7, skipping v4) — unusual
-          # redundancy for one brand. Keep the newest three (v5/v6/v7, likely
-          # covering current-generation vehicles still on the road) and cut
-          # the four oldest. kia_generic.h (shared helpers) stays — v5/v6/v7
-          # still use it.
-          for proto in kia_v0 kia_v1 kia_v2 kia_v3_v4; do
-            rm -f $PROTO/${proto}.c $PROTO/${proto}.h
-            sed -i "/#include \"${proto}.h\"/d"   $PROTO/protocol_items.h
-            sed -i "/&subghz_protocol_${proto},/d" $PROTO/protocol_items.c
-            echo "Stripped: $proto"
-          done
+          # Round 4 cut (issue #9 flash budget) — REVERTED per request: Kia
+          # alone shipped 7 active protocol variants (kia_v0..kia_v7,
+          # skipping v4), and v0/v1/v2/v3_v4 were cut as the four oldest to
+          # recover flash space, keeping only v5/v6/v7. Restored to ARF's
+          # stock, uncut state (all 7 variants present) — watch the "Check
+          # firmware size" step below; this was specifically cut for being
+          # ~32 KB over the C2 boundary (issue #9), so re-adding it may
+          # reopen that budget problem depending on what headroom the other
+          # size work since then has bought back.
 
           # Re-enable ALL standard SubGHz protocols that ARF comments out.
           # ARF strips non-automotive protocols to save flash; we restore full coverage.
