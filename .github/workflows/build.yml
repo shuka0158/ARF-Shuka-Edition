@@ -452,7 +452,30 @@ jobs:
             echo "ERROR: failed to register one_wire in lib/SConscript — ARF changed its layout" >&2
             exit 1
           }
-          echo "one_wire library added and registered"
+
+          # Compiling it isn't enough — firmware.elf's link step doesn't
+          # draw from lib/SConscript's module list at all. It links against
+          # targets/f7/target.json's own separate "linker_dependencies"
+          # array (firmware.scons: LIBS=fwenv["TARGET_CFG"].linker_dependencies).
+          # Skipping this half produced a real, working build (fbt succeeded)
+          # that still failed at the final link step: the SDK export table
+          # (firmware_api.o) references onewire_* symbols once they're
+          # SDK-approved, but nothing pulls one_wire.a into firmware.elf —
+          # "undefined reference to `onewire_host_reset'" etc.
+          TARGET_JSON=flipper-fw/targets/f7/target.json
+          if ! grep -q '"one_wire"' "$TARGET_JSON"; then
+            sed -i 's/"digital_signal",/"digital_signal",\n        "one_wire",/' "$TARGET_JSON"
+          fi
+          python3 -c "import json; json.load(open('$TARGET_JSON'))" || {
+            echo "ERROR: target.json is no longer valid JSON after patching — ARF changed its layout" >&2
+            exit 1
+          }
+          grep -q '"one_wire"' "$TARGET_JSON" || {
+            echo "ERROR: failed to register one_wire in target.json's linker_dependencies — ARF changed its layout" >&2
+            exit 1
+          }
+
+          echo "one_wire library added, compiled, and linked into firmware.elf"
 
       - name: Add Unitemp GPIO temperature sensor app
         run: |
