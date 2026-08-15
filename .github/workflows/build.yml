@@ -423,6 +423,26 @@ jobs:
           # existing behavior is unchanged unless the user opts out.
           python3 shuka-edition/scripts/patch_subghz_rx_led_toggle.py flipper-fw
 
+      - name: Add Unitemp GPIO temperature sensor app
+        run: |
+          # lab.flipper.net's catalog refuses installs onto this firmware —
+          # its compatibility check compares against the *official* API
+          # surface, which we've diverged from (DESFire stripped, etc., see
+          # the DESFire/protocol-strip steps above). Bundling wanted apps
+          # directly into the build sidesteps that catalog gate entirely:
+          # they're compiled against our own current SDK by our own fbt
+          # invocation below, so they're guaranteed to actually match rather
+          # than just report a version number that looks close enough.
+          #
+          # applications_user/ is fbt's standard drop-in dir for exactly
+          # this — auto-discovered by the app manifest scan, no SConstruct
+          # or menu wiring needed (see applications_user/README.md upstream).
+          git clone --depth 1 \
+            https://github.com/quen0n/unitemp-flipperzero.git \
+            flipper-fw/applications_user/unitemp
+          rm -rf flipper-fw/applications_user/unitemp/.git
+          echo "Unitemp added — reads DHT11/22, DS18B20, BMP280, HTU21+ over GPIO"
+
       - name: Remove vgm_console (bundled FlipperHTTP networking)
         run: |
           # video_game_module_console is fully self-contained (own directory,
