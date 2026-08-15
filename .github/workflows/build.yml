@@ -188,11 +188,11 @@ jobs:
           # alone shipped 7 active protocol variants (kia_v0..kia_v7,
           # skipping v4), and v0/v1/v2/v3_v4 were cut as the four oldest to
           # recover flash space, keeping only v5/v6/v7. Restored to ARF's
-          # stock, uncut state (all 7 variants present) — watch the "Check
-          # firmware size" step below; this was specifically cut for being
-          # ~32 KB over the C2 boundary (issue #9), so re-adding it may
-          # reopen that budget problem depending on what headroom the other
-          # size work since then has bought back.
+          # stock, uncut state (all 7 variants present). Confirmed by a real
+          # build this reopened the C2-boundary problem — 829 KB vs the
+          # 824 KB limit, over by 5,345 bytes — so the EMV NFC strip below
+          # (5,442 bytes, the cleanest single compensating cut available)
+          # was added specifically to buy back room for this restore.
 
           # Re-enable ALL standard SubGHz protocols that ARF comments out.
           # ARF strips non-automotive protocols to save flash; we restore full coverage.
@@ -338,6 +338,59 @@ jobs:
             clipper_plugin itso_plugin myki_plugin opal_plugin nol_plugin
 
           echo "DESFire support stripped."
+
+      - name: Strip EMV (bank card) NFC support (flash budget for Kia v0-v4 restore)
+        run: |
+          # Restoring Kia's 4 oldest SubGHz protocol variants (see below) put
+          # the build 5,345 bytes over the 824 KB C2 boundary. EMV support
+          # costs 5,442 bytes (measured from the size-breakdown diagnostic)
+          # for reading bank/payment cards — a real feature, but the
+          # cleanest single cut available: unlike FeliCa (Suica/transit,
+          # woven into Metroflip too) EMV only touches the core NFC lib and
+          # the main NFC app, no other app depends on it. Same surgical
+          # pattern as the DESFire strip above, since EMV is registered the
+          # same way (lib/nfc protocol table + SDK header exports).
+          REPO=flipper-fw
+          SHUKA=shuka-edition
+
+          sed -i '/emv/Id' "$REPO/targets/f7/api_symbols.csv"
+
+          # ── Core protocol library ──
+          rm -rf "$REPO/lib/nfc/protocols/emv"
+
+          NFC_DEVICE_DEFS=$REPO/lib/nfc/protocols/nfc_device_defs.c
+          sed -i '/#include <nfc\/protocols\/emv\/emv.h>/d' "$NFC_DEVICE_DEFS"
+          sed -i '/\[NfcProtocolEmv\] = &nfc_device_emv,/d'  "$NFC_DEVICE_DEFS"
+
+          NFC_POLLER_DEFS=$REPO/lib/nfc/protocols/nfc_poller_defs.c
+          sed -i '/#include <nfc\/protocols\/emv\/emv_poller_defs.h>/d' "$NFC_POLLER_DEFS"
+          sed -i '/\[NfcProtocolEmv\] = &emv_poller,/d'                "$NFC_POLLER_DEFS"
+
+          # nfc_protocol.c has EMV listed twice: once as an ISO14443-4A
+          # child candidate (single line, like DESFire's own entry) and once
+          # as its own 6-line parent/children config block — unlike DESFire
+          # this block isn't a one-liner, so a range delete is needed.
+          NFC_PROTOCOL=$REPO/lib/nfc/protocols/nfc_protocol.c
+          sed -i '/^    NfcProtocolEmv,$/d' "$NFC_PROTOCOL"
+          sed -i '/\[NfcProtocolEmv\] =/,/^        },$/d' "$NFC_PROTOCOL"
+
+          sed -i '/File("protocols\/emv\/emv.h"),/d'        "$REPO/lib/nfc/SConscript"
+          sed -i '/File("protocols\/emv\/emv_poller.h"),/d' "$REPO/lib/nfc/SConscript"
+
+          # ── Main NFC app ──
+          NFC=$REPO/applications/main/nfc
+          rm -rf "$NFC/helpers/protocol_support/emv"
+          rm -f "$NFC/scenes/nfc_scene_emv_transactions.c"
+          rm -f "$NFC/helpers/nfc_emv_parser.c" "$NFC/helpers/nfc_emv_parser.h"
+          rm -f "$NFC/plugins/supported_cards/emv.c"
+
+          sed -i '/ADD_SCENE(nfc, emv_transactions, EmvTransactions)/d' "$NFC/scenes/nfc_scene_config.h"
+          sed -i '/\[NfcProtocolEmv\] = "emv",/d' "$NFC/helpers/protocol_support/nfc_protocol_support.c"
+
+          python3 "$SHUKA/scripts/remove_fam_apps.py" "$NFC/application.fam" \
+            nfc_emv emv_parser
+
+          echo "EMV support stripped."
 
       - name: Add Shuka-Edition protocols on top of ARF
         run: |
