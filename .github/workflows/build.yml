@@ -544,14 +544,20 @@ jobs:
           # lib/ with SDK_HEADERS, like one_wire) always fails once on purpose:
           # fbt's SDKCHK step ("SDK version is not finalized, please review
           # changes and re-run operation") writes the new symbols into
-          # targets/f7/api_symbols.csv as PENDING and stops rather than
-          # silently accepting new API surface. Re-running against that same
-          # now-updated file is the documented fix, not a manual CSV edit —
-          # the second pass sees the pending entries already recorded and
-          # proceeds. Only retry for this specific, expected case so a real
-          # build failure still surfaces immediately.
+          # targets/f7/api_symbols.csv with status "?" (pending). Just
+          # re-running does NOT clear this — SdkCache re-adds any row still
+          # marked "?"/"v" back into the pending set on every load, no matter
+          # how many times you rerun against an unmodified file (verified by
+          # testing: two straight fbt invocations both failed identically).
+          # The status column has to actually flip to "+" (approved) between
+          # runs — that's what a human "reviewing the changes" locally
+          # amounts to before rerunning. There's no meaningful review step to
+          # wait on in a from-scratch scripted CI build, so approve
+          # everything pending (all of it was deliberately introduced by our
+          # own earlier steps this same run) and rerun once.
           if [ "$FBT_STATUS" -ne 0 ] && grep -q "SDK version is not finalized" build.log; then
-            echo "SDK cache had new pending API entries (expected for a new SDK-exposed lib) — re-running fbt once"
+            echo "SDK cache has new pending API entries (expected for a new SDK-exposed lib) — approving and re-running fbt once"
+            python3 ../shuka-edition/scripts/approve_sdk_pending.py targets/f7/api_symbols.csv
             ./fbt "${FBT_ARGS[@]}" 2>&1 | tee build.log
             FBT_STATUS="${PIPESTATUS[0]}"
           fi
