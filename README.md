@@ -4,6 +4,8 @@
 
 Custom Flipper Zero firmware by **shuka0158**, built on top of [D4C1-Labs/Flipper-ARF](https://github.com/D4C1-Labs/Flipper-ARF).
 
+Starring this repo will be hige support for me.
+
 [This project is made only for educational purposes!]
 
 
