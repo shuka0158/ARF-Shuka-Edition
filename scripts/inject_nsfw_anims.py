@@ -17,19 +17,24 @@ import sys, heatshrink2, tarfile, io, os
 
 
 def find_dolphin_ext_prefix(members):
+    # Runtime animations are flat: applications/services/desktop/animations/
+    # animation_storage.c defines ANIMATION_DIR as EXT_PATH("dolphin") and
+    # ANIMATION_MANIFEST_FILE as ANIMATION_DIR "/manifest.txt" — there is no
+    # "/external" subfolder the running firmware ever reads. fbt's own
+    # DolphinExtBuilder confirms this: its target dir for DOLPHIN_RES_TYPE
+    # "external" is ASSETS_WORK_DIR/"dolphin" (see assets/SConscript +
+    # scripts/fbt_tools/fbt_assets.py), i.e. manifest.txt and every animation
+    # folder land directly under "dolphin/" in the packed resources.ths, not
+    # "dolphin/external/". Injecting under a nested "external" path (as this
+    # function used to do via its fallback branch) writes files the Dolphin
+    # animation engine never looks at — they end up as dead weight in the
+    # archive instead of showing on-device.
     for m, _ in members:
         parts = m.name.split('/')
         for i, part in enumerate(parts):
-            if part == 'dolphin' and i + 1 < len(parts) and parts[i + 1] == 'external':
-                return '/'.join(parts[:i + 2])
-    # fallback: derive from any dolphin path
-    for m, _ in members:
-        if 'dolphin' in m.name:
-            parts = m.name.split('/')
-            for i, part in enumerate(parts):
-                if part == 'dolphin':
-                    return '/'.join(parts[:i + 1]) + '/external'
-    return 'ext/dolphin/external'
+            if part == 'dolphin':
+                return '/'.join(parts[:i + 1])
+    return 'ext/dolphin'
 
 
 def main():
