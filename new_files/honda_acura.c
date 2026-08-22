@@ -389,11 +389,11 @@ void subghz_protocol_decoder_honda_acura_get_string(void* context, FuriString* o
         output,
         "Honda/Acura 313/433MHz\r\n"
         "Key:%016llX\r\n"
-        "Sn:%07lX  Cnt:%04X\r\n"
+        "Sn:%07lX  Cnt:%04lX\r\n"
         "Cmd:%03X Btn:[%s]  %dbit",
         (unsigned long long)instance->generic.data,
         (unsigned long)instance->generic.serial,
-        instance->generic.cnt,
+        (unsigned long)instance->generic.cnt,
         instance->cmd,
         honda_acura_button_name(instance->generic.btn),
         instance->generic.data_count_bit);
