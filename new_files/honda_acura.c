@@ -176,6 +176,37 @@ static uint8_t honda_acura_cmd_to_btn(uint16_t cmd12) {
     return 0U;
 }
 
+/*
+ * Custom-button (D-pad) support for emulation.
+ *   OK/center = the captured button, UP = Lock, DOWN = Unlock.
+ * Only Lock/Unlock command codes are confirmed from real captures; add more
+ * (Trunk/Panic/Remote-Start) here once their 12-bit codes are captured, and
+ * bump honda_acura_custom_btn_count() accordingly.
+ */
+static uint8_t honda_acura_btn_to_custom(uint8_t btn) {
+    switch(btn) {
+    case HONDA_ACURA_BTN_LOCK: return 1U;
+    case HONDA_ACURA_BTN_UNLOCK: return 2U;
+    default: return 1U;
+    }
+}
+
+static uint8_t honda_acura_custom_btn_count(void) {
+    return 2U; /* Lock, Unlock — extend as more command codes are learned */
+}
+
+/* Command word (top 12 bits) for a custom-button index, in the same
+ * Manchester polarity as the original captured frame. */
+static uint16_t honda_acura_custom_to_cmd(uint8_t custom, bool inverted) {
+    uint16_t base;
+    switch(custom) {
+    case 2U: base = HONDA_ACURA_CMD_UNLOCK; break;
+    case 1U:
+    default: base = HONDA_ACURA_CMD_LOCK; break;
+    }
+    return inverted ? (uint16_t)(~base & 0x0FFFU) : base;
+}
+
 static const char* honda_acura_button_name(uint8_t btn) {
     switch(btn) {
     case HONDA_ACURA_BTN_LOCK: return "Lock";
@@ -230,6 +261,22 @@ LevelDuration subghz_protocol_encoder_honda_acura_yield(void* context) {
 static bool honda_acura_encoder_get_upload(SubGhzProtocolEncoderHondaAcura* instance) {
     furi_assert(instance);
     uint64_t data = instance->generic.data;
+
+    /* Apply the D-pad custom button: swap the 12-bit command field, keeping
+     * the fob serial and counter, in whatever Manchester polarity was captured. */
+    uint8_t custom = (subghz_custom_btn_get() == SUBGHZ_CUSTOM_BTN_OK) ?
+                         subghz_custom_btn_get_original() :
+                         subghz_custom_btn_get();
+    if(custom != 0U) {
+        const uint16_t orig_cmd = (uint16_t)((data >> 52) & 0x0FFFU);
+        const bool inverted = (orig_cmd == (uint16_t)(~HONDA_ACURA_CMD_LOCK & 0x0FFFU)) ||
+                              (orig_cmd == (uint16_t)(~HONDA_ACURA_CMD_UNLOCK & 0x0FFFU));
+        const uint16_t new_cmd = honda_acura_custom_to_cmd(custom, inverted);
+        data = (data & ~((uint64_t)0x0FFFU << 52)) | ((uint64_t)new_cmd << 52);
+        instance->generic.data = data;
+        instance->generic.btn = honda_acura_cmd_to_btn(new_cmd);
+    }
+
     size_t idx = 0;
 
     /* preamble: te_short square wave */
@@ -263,6 +310,15 @@ SubGhzProtocolStatus
         flipper_format,
         subghz_protocol_honda_acura_const.min_count_bit_for_found);
     if(ret != SubGhzProtocolStatusOk) return ret;
+
+    /* Register the D-pad remap for the emulate view (OK=captured button,
+     * UP=Lock, DOWN=Unlock). */
+    const uint16_t cmd = (uint16_t)((instance->generic.data >> 52) & 0x0FFFU);
+    if(subghz_custom_btn_get_original() == 0) {
+        subghz_custom_btn_set_original(honda_acura_btn_to_custom(honda_acura_cmd_to_btn(cmd)));
+    }
+    subghz_custom_btn_set_max(honda_acura_custom_btn_count());
+
     if(!honda_acura_encoder_get_upload(instance)) return SubGhzProtocolStatusErrorEncoderGetUpload;
     instance->encoder.is_running = true;
     return SubGhzProtocolStatusOk;
