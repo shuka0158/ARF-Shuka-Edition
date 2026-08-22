@@ -2,12 +2,19 @@
 
 #define HONDA_STATIC_BIT_COUNT       64
 #define HONDA_STATIC_MIN_SYMBOLS     36
-#define HONDA_STATIC_SHORT_BASE_US   28
-#define HONDA_STATIC_SHORT_SPAN_US   70
-#define HONDA_STATIC_LONG_BASE_US    61
-#define HONDA_STATIC_LONG_SPAN_US    130
-#define HONDA_STATIC_SYNC_TIME_US    700
-#define HONDA_STATIC_ELEMENT_TIME_US 63
+/*
+ * Real on-air timing (measured from Flipper BinRAW captures of a 2014 Accord
+ * fob @313.85MHz): Manchester half-bit element ~250us, long element ~500us,
+ * inter-frame / preamble->data sync gap ~700-930us. The previous values
+ * (~63us element) were ~4x too small, so every real pulse fell past the LONG
+ * ceiling and was treated as an end gap -> nothing ever decoded.
+ */
+#define HONDA_STATIC_SHORT_BASE_US   90
+#define HONDA_STATIC_SHORT_SPAN_US   280 /* short window 90..370us   (~250us, jitter-tolerant) */
+#define HONDA_STATIC_LONG_BASE_US    370
+#define HONDA_STATIC_LONG_SPAN_US    300 /* long  window 370..670us  (~500us) */
+#define HONDA_STATIC_SYNC_TIME_US    800
+#define HONDA_STATIC_ELEMENT_TIME_US 250
 #define HONDA_STATIC_UPLOAD_CAPACITY \
     (1U + HONDA_STATIC_PREAMBLE_ALTERNATING_COUNT + (2U * HONDA_STATIC_BIT_COUNT) + 1U)
 #define HONDA_STATIC_SYMBOL_CAPACITY            512
@@ -75,19 +82,6 @@ static void honda_static_u64_to_bytes_be(uint64_t value, uint8_t bytes[8]) {
     }
 }
 
-static uint8_t honda_static_get_bits(const uint8_t* data, uint8_t start, uint8_t count) {
-    uint32_t value = 0;
-
-    for(uint8_t i = 0; i < count; i++) {
-        const uint8_t bit_index = start + i;
-        const uint8_t byte = data[bit_index >> 3U];
-        const uint8_t shift = (uint8_t)(~bit_index) & 0x07U;
-        value = (value << 1U) | ((byte >> shift) & 1U);
-    }
-
-    return (uint8_t)value;
-}
-
 static uint32_t honda_static_get_bits_u32(const uint8_t* data, uint8_t start, uint8_t count) {
     uint32_t value = 0;
 
@@ -138,11 +132,24 @@ static uint8_t honda_static_symbol_get(const uint8_t* buf, uint16_t index) {
     return (uint8_t)((buf[byte_index] >> shift) & 1U);
 }
 
-static uint8_t honda_static_reverse_bits8(uint8_t value) {
-    value = (uint8_t)(((value >> 4U) | (value << 4U)) & 0xFFU);
-    value = (uint8_t)(((value & 0x33U) << 2U) | ((value >> 2U) & 0x33U));
-    value = (uint8_t)(((value & 0x55U) << 1U) | ((value >> 1U) & 0x55U));
-    return value;
+/*
+ * Real frame command field = top 12 bits of the 64-bit Manchester payload.
+ * Values reverse-engineered and validated across all provided lock/unlock
+ * captures of a 2014 Accord fob. Serial (bits 20..47) and rolling counter
+ * (bits 48..63) follow. This is a ROLLING code — we identify & label the
+ * frame, we do not predict the next counter. Returns the button index used
+ * by honda_static_button_names (1=Lock, 2=Unlock, ...) or 0 if unknown.
+ */
+#define HONDA_STATIC_CMD_LOCK   0xC20U
+#define HONDA_STATIC_CMD_UNLOCK 0xA28U
+
+static uint8_t honda_static_cmd_to_button(uint16_t cmd12) {
+    /* Accept the decoded polarity or its 12-bit inverse (a flipped Manchester
+     * phase inverts every bit) so both orientations classify correctly. */
+    const uint16_t inv = (uint16_t)((~cmd12) & 0x0FFFU);
+    if(cmd12 == HONDA_STATIC_CMD_LOCK || inv == HONDA_STATIC_CMD_LOCK) return 1U; /* Lock */
+    if(cmd12 == HONDA_STATIC_CMD_UNLOCK || inv == HONDA_STATIC_CMD_UNLOCK) return 2U; /* Unlock */
+    return 0U;
 }
 
 static bool honda_static_is_valid_button(uint8_t button) {
@@ -151,10 +158,6 @@ static bool honda_static_is_valid_button(uint8_t button) {
     }
 
     return ((0x336U >> button) & 1U) != 0U;
-}
-
-static bool honda_static_is_valid_serial(uint32_t serial) {
-    return (serial != 0U) && (serial != 0x0FFFFFFFU);
 }
 
 static uint8_t honda_static_encoder_remap_button(uint8_t button) {
@@ -239,67 +242,6 @@ static void honda_static_build_packet_bytes(const HondaStaticFields* fields, uin
     honda_static_set_bits(packet, 56, 8, checksum);
 }
 
-static bool
-    honda_static_validate_forward_packet(const uint8_t packet[9], HondaStaticFields* fields) {
-    const uint8_t button = honda_static_get_bits(packet, 0, 4);
-    const uint32_t serial = honda_static_get_bits_u32(packet, 4, 28);
-    const uint32_t counter = honda_static_get_bits_u32(packet, 32, 24);
-    const uint8_t checksum = honda_static_get_bits(packet, 56, 8);
-
-    uint8_t checksum_calc = 0U;
-    for(size_t i = 0; i < 7; i++) {
-        checksum_calc ^= packet[i];
-    }
-
-    if(checksum != checksum_calc) {
-        return false;
-    }
-    if(!honda_static_is_valid_button(button)) {
-        return false;
-    }
-    if(!honda_static_is_valid_serial(serial)) {
-        return false;
-    }
-
-    fields->button = button;
-    fields->serial = serial;
-    fields->counter = counter;
-    fields->checksum = checksum;
-
-    return true;
-}
-
-static bool
-    honda_static_validate_reverse_packet(const uint8_t packet[9], HondaStaticFields* fields) {
-    uint8_t reversed[9];
-    for(size_t i = 0; i < COUNT_OF(reversed); i++) {
-        reversed[i] = honda_static_reverse_bits8(packet[i]);
-    }
-
-    const uint8_t button = honda_static_get_bits(reversed, 0, 4);
-    const uint32_t serial = honda_static_get_bits_u32(reversed, 4, 28);
-    const uint32_t counter = honda_static_get_bits_u32(reversed, 32, 24);
-
-    uint8_t checksum = 0U;
-    for(size_t i = 0; i < 7; i++) {
-        checksum ^= reversed[i];
-    }
-
-    if(!honda_static_is_valid_button(button)) {
-        return false;
-    }
-    if(!honda_static_is_valid_serial(serial)) {
-        return false;
-    }
-
-    fields->button = button;
-    fields->serial = serial;
-    fields->counter = counter;
-    fields->checksum = checksum;
-
-    return true;
-}
-
 static bool honda_static_manchester_pack_64(
     const uint8_t* symbol_bits,
     uint16_t count,
@@ -352,51 +294,37 @@ static bool honda_static_parse_symbols(SubGhzProtocolDecoderHondaStatic* instanc
     const uint8_t* symbol_bits = instance->symbols;
     HondaStaticFields decoded;
 
-    uint16_t index = 1U;
-    uint16_t transitions = 0U;
+    if(count < HONDA_STATIC_MIN_SYMBOLS) {
+        return false;
+    }
 
-    while(index < count) {
-        if(honda_static_symbol_get(symbol_bits, index) !=
-           honda_static_symbol_get(symbol_bits, index - 1U)) {
-            transitions++;
-        } else {
-            if(transitions > HONDA_STATIC_PREAMBLE_MAX_TRANSITIONS) {
-                break;
-            }
-            transitions = 0U;
+    /*
+     * After the timing fix the ~800us sync gap flushes the preamble into its
+     * own (undecodable) symbol batch, so the buffer we get here is the data
+     * payload itself. Manchester alignment can start on either half of a cell,
+     * so try a few leading offsets and take the first that yields a recognised
+     * Honda command in the top 12 bits.
+     */
+    for(uint16_t start = 0U; start < 16U && (uint16_t)(start + 1U) < count; start++) {
+        uint8_t packet[9] = {0};
+        uint16_t bit_count = 0U;
+
+        if(!honda_static_manchester_pack_64(
+               symbol_bits, count, start, inverted, packet, &bit_count)) {
+            continue;
         }
-        index++;
-    }
 
-    if(index >= count) {
-        return false;
-    }
+        const uint16_t cmd12 = (uint16_t)honda_static_get_bits_u32(packet, 0, 12);
+        const uint8_t button = honda_static_cmd_to_button(cmd12);
+        if(button == 0U) {
+            continue;
+        }
 
-    while(((uint16_t)(index + 1U) < count) && (honda_static_symbol_get(symbol_bits, index) ==
-                                               honda_static_symbol_get(symbol_bits, index + 1U))) {
-        index++;
-    }
+        decoded.button = button;
+        decoded.serial = honda_static_get_bits_u32(packet, 20, 28); /* fixed device id */
+        decoded.counter = honda_static_get_bits_u32(packet, 48, 16); /* rolling counter */
+        decoded.checksum = 0U;
 
-    const uint16_t data_start = index;
-
-    uint8_t packet[9] = {0};
-    uint16_t bit_count = 0U;
-
-    if(!honda_static_manchester_pack_64(
-           symbol_bits, count, data_start, inverted, packet, &bit_count)) {
-        return false;
-    }
-
-    if(honda_static_validate_forward_packet(packet, &decoded)) {
-        honda_static_decoder_commit(instance, &decoded);
-        return true;
-    }
-
-    if(inverted) {
-        return false;
-    }
-
-    if(honda_static_validate_reverse_packet(packet, &decoded)) {
         honda_static_decoder_commit(instance, &decoded);
         return true;
     }
