@@ -585,6 +585,15 @@ jobs:
           grep -q 'fap_category="Sub-GHz"' \
             flipper-fw/applications_user/car_breaker19/application.fam \
             || { echo "ERROR: car_breaker19 fap_category retag failed"; exit 1; }
+          # variable_item_list_set_header() doesn't exist in ARF's older GUI SDK
+          # (it's a newer/official-firmware API), so the app hits
+          # -Werror=implicit-function-declaration. The call only sets a cosmetic
+          # list header ("Capture Options") — drop it so the app builds on ARF.
+          sed -i '/variable_item_list_set_header/d' \
+            flipper-fw/applications_user/car_breaker19/car_breaker19.c
+          ! grep -q 'variable_item_list_set_header' \
+            flipper-fw/applications_user/car_breaker19/car_breaker19.c \
+            || { echo "ERROR: car_breaker19 header-call strip failed"; exit 1; }
           echo "Car Breaker 19 added under Sub-GHz"
 
       - name: Remove vgm_console (bundled FlipperHTTP networking)
