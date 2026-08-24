@@ -398,6 +398,21 @@ jobs:
 
           echo "EMV support stripped."
 
+      - name: Harden NFC app against stripped protocols (DESFire/EMV crash fix)
+        run: |
+          # DESFire and EMV are removed from the poller/device tables and from
+          # nfc_protocol_support_plugin_names[] above, but stay defined in the
+          # NfcProtocol enum. Reaching one of them in nfc_protocol_support_alloc
+          # formats a plugin path with a NULL "%s" and hard-faults the firmware
+          # ("Flipper crashed and was rebooted NULL pointer dereference"), which
+          # "Read Specific Card Type" triggers directly (it lists every enum
+          # protocol). Guard the alloc and hide stripped protocols from that menu.
+          REPO=flipper-fw
+          SHUKA=shuka-edition
+          python3 "$SHUKA/scripts/patch_nfc_stripped_protocol_crash.py" \
+            "$REPO/applications/main/nfc"
+          echo "NFC stripped-protocol crash guard applied."
+
       - name: Add Shuka-Edition protocols on top of ARF
         run: |
           REPO=flipper-fw
@@ -552,6 +567,34 @@ jobs:
             flipper-fw/applications_user/unitemp
           rm -rf flipper-fw/applications_user/unitemp/.git
           echo "Unitemp added — reads DHT11/22, DS18B20, BMP280, HTU21+ over GPIO"
+
+      - name: Add Car Breaker 19 app (Sub-GHz)
+        run: |
+          # fbettag/car_breaker_19 — Flipper Zero RKE threat monitor that
+          # passively profiles Honda rolling-code anomalies and static-key
+          # regressions. Bundled directly (same rationale as Unitemp above:
+          # compiled against our own SDK, sidesteps the lab.flipper.net
+          # catalog gate). Its manifest ships fap_category="Research"; retag
+          # it "Sub-GHz" so it lands under Apps -> Sub-GHz as requested.
+          git clone --depth 1 \
+            https://github.com/fbettag/car_breaker_19.git \
+            flipper-fw/applications_user/car_breaker19
+          rm -rf flipper-fw/applications_user/car_breaker19/.git
+          sed -i 's/fap_category="Research"/fap_category="Sub-GHz"/' \
+            flipper-fw/applications_user/car_breaker19/application.fam
+          grep -q 'fap_category="Sub-GHz"' \
+            flipper-fw/applications_user/car_breaker19/application.fam \
+            || { echo "ERROR: car_breaker19 fap_category retag failed"; exit 1; }
+          # variable_item_list_set_header() doesn't exist in ARF's older GUI SDK
+          # (it's a newer/official-firmware API), so the app hits
+          # -Werror=implicit-function-declaration. The call only sets a cosmetic
+          # list header ("Capture Options") — drop it so the app builds on ARF.
+          sed -i '/variable_item_list_set_header/d' \
+            flipper-fw/applications_user/car_breaker19/car_breaker19.c
+          ! grep -q 'variable_item_list_set_header' \
+            flipper-fw/applications_user/car_breaker19/car_breaker19.c \
+            || { echo "ERROR: car_breaker19 header-call strip failed"; exit 1; }
+          echo "Car Breaker 19 added under Sub-GHz"
 
       - name: Remove vgm_console (bundled FlipperHTTP networking)
         run: |

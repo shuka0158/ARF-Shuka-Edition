@@ -302,6 +302,18 @@ static bool honda_acura_encoder_get_upload(SubGhzProtocolEncoderHondaAcura* inst
         instance->generic.btn = new_btn;
     }
 
+    /* Rolling counter: advance it on every transmit so each emulated frame is
+     * a genuinely different code, exactly like the sibling car protocols
+     * (renault/ford/kia). Without this the encoder re-emits a byte-identical
+     * frame on every press — which is what a HackRF capture shows as "the
+     * signal never changes". The counter lives in the low 16 bits of the
+     * 64-bit frame (frame bits [15:0]). */
+    uint16_t cnt = (uint16_t)(data & 0xFFFFU);
+    cnt = (uint16_t)(cnt + furi_hal_subghz_get_rolling_counter_mult());
+    data = (data & ~(uint64_t)0xFFFFU) | (uint64_t)cnt;
+    instance->generic.data = data;
+    instance->generic.cnt = cnt;
+
     size_t idx = 0;
 
     /* preamble: te_short square wave */
