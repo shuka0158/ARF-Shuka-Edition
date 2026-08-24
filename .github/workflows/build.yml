@@ -39,6 +39,10 @@ jobs:
     needs: test
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [nfc, protocols]   # nfc=full DESFire/EMV NFC stack; protocols=all SubGHz protocols
 
     steps:
       - name: Checkout ARF-Shuka-Edition
@@ -184,9 +188,10 @@ jobs:
             echo "Stripped: $proto"
           done
 
-          # one-off (full-NFC build): cut the 4 OLDEST Kia RKE variants
-          # (v0/v1/v2/v3_v4), keeping v5/v6/v7, to free ~5.5 KB for the
-          # restored DESFire/EMV NFC stack. ARF-stock protocols.
+          # NFC variant only: cut the 4 OLDEST Kia RKE variants (v0/v1/v2/v3_v4),
+          # keeping v5/v6/v7, to free ~5.5 KB for the restored DESFire/EMV NFC
+          # stack. The protocols variant keeps all Kia variants.
+          if [ "${{ matrix.variant }}" = "nfc" ]; then
           for proto in kia_v0 kia_v1 kia_v2 kia_v3_v4; do
             rm -f $PROTO/${proto}.c $PROTO/${proto}.h
             sed -i "/#include \"${proto}.h\"/d"        $PROTO/protocol_items.h
@@ -197,6 +202,7 @@ jobs:
           for name in "Kia V0" "Kia V1" "Kia V2" "Kia V3/V4"; do
             sed -i "\|{\"${name}\",|,+1d" $PROTO/protocol_items.c
           done
+          fi   # end NFC-variant Kia cut
 
           # Round 4 cut (issue #9 flash budget) — REVERTED per request: Kia
           # alone shipped 7 active protocol variants (kia_v0..kia_v7,
@@ -243,10 +249,15 @@ jobs:
           # free ~16 KB for the restored DESFire+EMV NFC stack. Keeps all
           # automotive protocols (Kia, toyota, etc.). came/nice/princeton are
           # gate openers, not car RKE.
-          # one-off: re-enable nothing here (toyota covered by Shuka toyota_lexus);
-          # frees ARF 'toyota' flash for the full NFC stack.
-          for proto in \
-            _none_; do
+          # NFC variant: re-enable nothing (toyota covered by Shuka toyota_lexus)
+          # to free flash for the full DESFire/EMV NFC stack. Protocols variant:
+          # re-enable the gate/garage protocols + toyota for full coverage.
+          if [ "${{ matrix.variant }}" = "protocols" ]; then
+            REENABLE="came came_atomo came_twee nice_flo nice_flor_s princeton toyota"
+          else
+            REENABLE=""
+          fi
+          for proto in $REENABLE; do
             if grep -q "//&subghz_protocol_${proto}," "$PROTO_ITEMS"; then
               sed -i -E "s|//(&subghz_protocol_${proto},)|\1|" "$PROTO_ITEMS"
               echo "  uncommented: ${proto}"
@@ -258,7 +269,7 @@ jobs:
           echo "Total active protocol entries: ${ENABLED}"
 
       - name: Strip Mifare DESFire support (issue #9 flash budget)
-        if: false  # one-off: keep full DESFire/EMV NFC stack
+        if: ${{ matrix.variant == 'protocols' }}
         run: |
           # ~9 KB of firmware.dfu. Unlike SubGHz protocols (a simple array),
           # DESFire is woven into shared NFC library code (Type 4 Tag) and
@@ -358,7 +369,7 @@ jobs:
           echo "DESFire support stripped."
 
       - name: Strip EMV (bank card) NFC support (flash budget for Kia v0-v4 restore)
-        if: false  # one-off: keep full DESFire/EMV NFC stack
+        if: ${{ matrix.variant == 'protocols' }}
         run: |
           # Restoring Kia's 4 oldest SubGHz protocol variants (see below) put
           # the build 5,345 bytes over the 824 KB C2 boundary. EMV support
@@ -418,7 +429,7 @@ jobs:
           echo "EMV support stripped."
 
       - name: Harden NFC app against stripped protocols (DESFire/EMV crash fix)
-        if: false  # one-off: keep full DESFire/EMV NFC stack
+        if: ${{ matrix.variant == 'protocols' }}
         run: |
           # DESFire and EMV are removed from the poller/device tables and from
           # nfc_protocol_support_plugin_names[] above, but stay defined in the
@@ -887,7 +898,7 @@ jobs:
               echo "resources.ths: $(du -sh "$RESOURCES_THS" | cut -f1) (full, not slimmed)"
             fi
 
-            BUNDLE_NAME="flipper-z-f7-update-arf-shuka-edition.tgz"
+            BUNDLE_NAME="flipper-z-f7-update-arf-shuka-edition-${{ matrix.variant }}.tgz"
             tar -czf "artifacts/${BUNDLE_NAME}" \
               --exclude='*/radio.bin' \
               -C "$(dirname "$UPDATE_DIR")" "$(basename "$UPDATE_DIR")"
@@ -897,6 +908,12 @@ jobs:
             find flipper-fw/dist -type d | sort
           fi
 
+          # variant-suffix the DFUs so both variants coexist in one release
+          for fdfu in artifacts/*.dfu; do
+            [ -f "$fdfu" ] || continue
+            case "$fdfu" in *-${{ matrix.variant }}.dfu) ;; *) mv "$fdfu" "${fdfu%.dfu}-${{ matrix.variant }}.dfu" ;; esac
+          done
+
           # Include animation pack (NSFW-only — no "safe" pack is built anymore)
           cp artifacts_anim/NSFW-Shuka-animations.zip artifacts/ 2>/dev/null || true
           echo "=== artifacts/ ==="
@@ -905,64 +922,97 @@ jobs:
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ARF-Shuka-Edition-${{ github.sha }}
+          name: firmware-${{ matrix.variant }}
           path: artifacts/
           retention-days: 30
 
-      - name: Publish OTA bundle to docs/ for same-origin web flash
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout ARF-Shuka-Edition
+        uses: actions/checkout@v4
+        with:
+          path: shuka-edition
+
+      - name: Download all variant artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dl
+
+      - name: Assemble release + docs (both variants)
+        id: assemble
+        run: |
+          set -e
+          SHORT_SHA=${GITHUB_SHA:0:7}
+          ARF_TAG=$(cat shuka-edition/ARF_VERSION 2>/dev/null | tr -d '[:space:]')
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "arf_tag=$ARF_TAG"    >> "$GITHUB_OUTPUT"
+
+          mkdir -p release
+          find dl -type f \( -name '*.tgz' -o -name '*.dfu' -o -name '*.zip' \) -exec cp -n {} release/ \;
+          echo "=== release assets ==="; ls -lh release/
+
+          # web-flash: publish both variant bundles/DFUs, and keep the NFC variant
+          # as the default latest-* (recommended: NFC works).
+          docs=shuka-edition/docs
+          nfc_b=$(ls release/flipper-z-f7-update-arf-shuka-edition-nfc.tgz 2>/dev/null || true)
+          pro_b=$(ls release/flipper-z-f7-update-arf-shuka-edition-protocols.tgz 2>/dev/null || true)
+          nfc_d=$(ls release/flipper-z-f7-full-arf-shuka-edition-nfc.dfu 2>/dev/null || true)
+          pro_d=$(ls release/flipper-z-f7-full-arf-shuka-edition-protocols.dfu 2>/dev/null || true)
+          [ -n "$nfc_b" ] && cp "$nfc_b" "$docs/latest-update-nfc.tgz"       && cp "$nfc_b" "$docs/latest-update.tgz"
+          [ -n "$pro_b" ] && cp "$pro_b" "$docs/latest-update-protocols.tgz"
+          [ -n "$nfc_d" ] && cp "$nfc_d" "$docs/latest-full-nfc.dfu"         && cp "$nfc_d" "$docs/latest-full.dfu"
+          [ -n "$pro_d" ] && cp "$pro_d" "$docs/latest-full-protocols.dfu"
+          printf '%s\n%s\n%s\n' "$SHORT_SHA" "$ARF_TAG" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$docs/latest-build.txt"
+
+      - name: Commit docs (main push only)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          BUNDLE=$(ls artifacts/flipper-z-f7-update-arf-shuka-edition.tgz 2>/dev/null || ls artifacts/*.tgz 2>/dev/null | head -1)
-          if [ -z "$BUNDLE" ]; then
-            echo "No .tgz to publish — web flash will not work"
-            exit 0
-          fi
-          cp "$BUNDLE" shuka-edition/docs/latest-update.tgz
-          # Also publish the full DFU for the web flasher DFU recovery mode
-          DFU_FULL=$(find artifacts -name "flipper-z-f7-full-*.dfu" | head -1)
-          if [ -n "$DFU_FULL" ]; then
-            cp "$DFU_FULL" shuka-edition/docs/latest-full.dfu
-            echo "DFU published to docs/latest-full.dfu ($(du -sh shuka-edition/docs/latest-full.dfu | cut -f1))"
-          fi
-          # latest-build.txt: SHORT_SHA, ARF_TAG, ISO timestamp (one per line)
-          printf '%s\n%s\n%s\n' \
-            "${{ env.SHORT_SHA }}" \
-            "${{ env.ARF_TAG }}" \
-            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            > shuka-edition/docs/latest-build.txt
           cd shuka-edition
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/latest-update.tgz docs/latest-build.txt docs/flash.html docs/latest-full.dfu 2>/dev/null || true
-          git commit -m "ci: publish OTA bundle ${{ env.SHORT_SHA }} [skip ci]" || echo "Nothing to commit"
-          git push
+          git add docs/ 2>/dev/null || true
+          git commit -m "ci: publish OTA bundles (nfc+protocols) ${GITHUB_SHA:0:7} [skip ci]" || { echo "Nothing to commit"; exit 0; }
+          for try in 1 2 3; do
+            git pull --rebase --autostash origin main && git push && break
+            echo "push retry $try"; sleep 3
+          done
 
-      - name: Create GitHub Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+      - name: Create GitHub Release (both variants)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || env.SHORT_SHA }}
-          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || env.SHORT_SHA }}
-          files: artifacts/*
-          body: |
-            ## ARF-Shuka-Edition ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || env.SHORT_SHA }}
-
-            **Based on ARF:** `${{ env.ARF_TAG }}`
-
-            ### How to install
-
-            **Recommended — download `flipper-z-f7-update-arf-shuka-edition.tgz`**
-            Open qFlipper → Install from file → select the `.tgz`
-            Updates firmware + Infrared, NFC, RFID, GPIO, Bad USB, U2F apps in one step.
-
-            **Firmware only — download `flipper-z-f7-full-arf-shuka-edition.dfu`**
-            Open qFlipper → Install from file → select the `.dfu`
-            Updates the firmware binary only, does not touch your SD card.
-
-            See [README](README.md) for full instructions and protocol list.
-
-            ### Animations
-            NSFW animations are embedded in the OTA bundle and deploy automatically to `/ext/dolphin/external/` on your SD card.
-            Download `NSFW-Shuka-animations.zip` if you want to manually copy them to the SD card (without flashing).
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || steps.assemble.outputs.short_sha }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || steps.assemble.outputs.short_sha }}
+          files: release/*
           draft: false
           prerelease: false
+          body: |
+            ## ARF-Shuka-Edition ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || steps.assemble.outputs.short_sha }}
+
+            **Based on ARF:** `${{ steps.assemble.outputs.arf_tag }}`
+
+            This release ships **two firmware variants** — pick one:
+
+            ### 🟢 NFC variant (recommended) — `*-nfc.*`
+            Full DESFire/EMV NFC stack: **NFC auto-detect (Read) works** on bank/DESFire/ISO14443-4A cards.
+            Trade-off: omits 6 gate/garage SubGHz protocols (came/nice/princeton), ARF `toyota`
+            (covered by `toyota_lexus`), and the 4 oldest Kia RKE variants (v0–v4; v5/v6/v7 kept).
+            - OTA (firmware + apps): `flipper-z-f7-update-arf-shuka-edition-nfc.tgz`
+            - Firmware only: `flipper-z-f7-full-arf-shuka-edition-nfc.dfu`
+
+            ### 🔵 Protocols variant — `*-protocols.*`
+            **All SubGHz protocols present** (full automotive coverage). Trade-off: NFC auto-detect
+            **crashes on ISO14443-4A cards** (DESFire/EMV stripped for flash). "Read Specific Card
+            Type" still works.
+            - OTA (firmware + apps): `flipper-z-f7-update-arf-shuka-edition-protocols.tgz`
+            - Firmware only: `flipper-z-f7-full-arf-shuka-edition-protocols.dfu`
+
+            ### Install
+            qFlipper → Install from file → the `.tgz` (firmware + apps) or `.dfu` (firmware only).
+
+            ### Animations
+            NSFW animations are embedded in each OTA bundle; download `NSFW-Shuka-animations.zip` to copy manually.
