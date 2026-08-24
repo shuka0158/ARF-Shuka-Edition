@@ -225,10 +225,11 @@ jobs:
           #   Kept: princeton, came/came_atomo/came_twee, nice_flo/nice_flor_s —
           #   widest real-world gate/garage coverage per KB of the batch — plus
           #   toyota, which is automotive.
+          # one-off (full-NFC build): gate/garage protocols NOT re-enabled to
+          # free ~16 KB for the restored DESFire+EMV NFC stack. Keeps all
+          # automotive protocols (Kia, toyota, etc.). came/nice/princeton are
+          # gate openers, not car RKE.
           for proto in \
-            came came_atomo came_twee \
-            nice_flo nice_flor_s \
-            princeton \
             toyota; do
             if grep -q "//&subghz_protocol_${proto}," "$PROTO_ITEMS"; then
               sed -i -E "s|//(&subghz_protocol_${proto},)|\1|" "$PROTO_ITEMS"
@@ -241,6 +242,7 @@ jobs:
           echo "Total active protocol entries: ${ENABLED}"
 
       - name: Strip Mifare DESFire support (issue #9 flash budget)
+        if: false  # one-off: keep full DESFire/EMV NFC stack
         run: |
           # ~9 KB of firmware.dfu. Unlike SubGHz protocols (a simple array),
           # DESFire is woven into shared NFC library code (Type 4 Tag) and
@@ -340,6 +342,7 @@ jobs:
           echo "DESFire support stripped."
 
       - name: Strip EMV (bank card) NFC support (flash budget for Kia v0-v4 restore)
+        if: false  # one-off: keep full DESFire/EMV NFC stack
         run: |
           # Restoring Kia's 4 oldest SubGHz protocol variants (see below) put
           # the build 5,345 bytes over the 824 KB C2 boundary. EMV support
@@ -399,6 +402,7 @@ jobs:
           echo "EMV support stripped."
 
       - name: Harden NFC app against stripped protocols (DESFire/EMV crash fix)
+        if: false  # one-off: keep full DESFire/EMV NFC stack
         run: |
           # DESFire and EMV are removed from the poller/device tables and from
           # nfc_protocol_support_plugin_names[] above, but stay defined in the
