@@ -184,6 +184,20 @@ jobs:
             echo "Stripped: $proto"
           done
 
+          # one-off (full-NFC build): cut the 4 OLDEST Kia RKE variants
+          # (v0/v1/v2/v3_v4), keeping v5/v6/v7, to free ~5.5 KB for the
+          # restored DESFire/EMV NFC stack. ARF-stock protocols.
+          for proto in kia_v0 kia_v1 kia_v2 kia_v3_v4; do
+            rm -f $PROTO/${proto}.c $PROTO/${proto}.h
+            sed -i "/#include \"${proto}.h\"/d"        $PROTO/protocol_items.h
+            sed -i "/&subghz_protocol_${proto},/d"      $PROTO/protocol_items.c
+            echo "Cut Kia variant: $proto"
+          done
+          # remove their 2-line TX catalog blocks (name string based)
+          for name in "Kia V0" "Kia V1" "Kia V2" "Kia V3/V4"; do
+            sed -i "\|{\"${name}\",|,+1d" $PROTO/protocol_items.c
+          done
+
           # Round 4 cut (issue #9 flash budget) — REVERTED per request: Kia
           # alone shipped 7 active protocol variants (kia_v0..kia_v7,
           # skipping v4), and v0/v1/v2/v3_v4 were cut as the four oldest to
@@ -229,8 +243,10 @@ jobs:
           # free ~16 KB for the restored DESFire+EMV NFC stack. Keeps all
           # automotive protocols (Kia, toyota, etc.). came/nice/princeton are
           # gate openers, not car RKE.
+          # one-off: re-enable nothing here (toyota covered by Shuka toyota_lexus);
+          # frees ARF 'toyota' flash for the full NFC stack.
           for proto in \
-            toyota; do
+            _none_; do
             if grep -q "//&subghz_protocol_${proto}," "$PROTO_ITEMS"; then
               sed -i -E "s|//(&subghz_protocol_${proto},)|\1|" "$PROTO_ITEMS"
               echo "  uncommented: ${proto}"
