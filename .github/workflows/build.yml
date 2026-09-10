@@ -531,107 +531,19 @@ jobs:
           # existing behavior is unchanged unless the user opts out.
           python3 shuka-edition/scripts/patch_subghz_rx_led_toggle.py flipper-fw
 
-      - name: Add one_wire library (required by Unitemp's DS18B20 support)
-        run: |
-          # ARF removed lib/one_wire entirely (dir absent, not just
-          # commented out of lib/SConscript's BuildModules list) — confirmed
-          # by grepping a fresh ARF checkout, zero hits. Unitemp's GPIO
-          # helper unconditionally #includes <one_wire/one_wire_host.h>
-          # (used for DS18B20 support), so without this the very first
-          # build after adding Unitemp fails outright:
-          #   fatal error: one_wire/one_wire_host.h: No such file or directory
-          # Same fix pattern as the "Add missing apps" step above: pull the
-          # small, self-contained library straight from official firmware.
-          git clone --depth 1 --filter=blob:none --sparse \
-            https://github.com/flipperdevices/flipperzero-firmware.git flipper-official-lib
-          cd flipper-official-lib
-          git sparse-checkout set lib/one_wire
-          cd ..
-          cp -r flipper-official-lib/lib/one_wire flipper-fw/lib/one_wire
-          rm -rf flipper-official-lib
-
-          # Register it so fbt actually compiles it — BuildModules is an
-          # explicit list, not a directory scan.
-          if ! grep -q '"one_wire"' flipper-fw/lib/SConscript; then
-            sed -i 's/"digital_signal",/"digital_signal",\n        "one_wire",/' \
-              flipper-fw/lib/SConscript
-          fi
-          grep -q '"one_wire"' flipper-fw/lib/SConscript || {
-            echo "ERROR: failed to register one_wire in lib/SConscript — ARF changed its layout" >&2
-            exit 1
-          }
-
-          # Compiling it isn't enough — firmware.elf's link step doesn't
-          # draw from lib/SConscript's module list at all. It links against
-          # targets/f7/target.json's own separate "linker_dependencies"
-          # array (firmware.scons: LIBS=fwenv["TARGET_CFG"].linker_dependencies).
-          # Skipping this half produced a real, working build (fbt succeeded)
-          # that still failed at the final link step: the SDK export table
-          # (firmware_api.o) references onewire_* symbols once they're
-          # SDK-approved, but nothing pulls one_wire.a into firmware.elf —
-          # "undefined reference to `onewire_host_reset'" etc.
-          TARGET_JSON=flipper-fw/targets/f7/target.json
-          if ! grep -q '"one_wire"' "$TARGET_JSON"; then
-            sed -i 's/"digital_signal",/"digital_signal",\n        "one_wire",/' "$TARGET_JSON"
-          fi
-          python3 -c "import json; json.load(open('$TARGET_JSON'))" || {
-            echo "ERROR: target.json is no longer valid JSON after patching — ARF changed its layout" >&2
-            exit 1
-          }
-          grep -q '"one_wire"' "$TARGET_JSON" || {
-            echo "ERROR: failed to register one_wire in target.json's linker_dependencies — ARF changed its layout" >&2
-            exit 1
-          }
-
-          echo "one_wire library added, compiled, and linked into firmware.elf"
-
-      - name: Add Unitemp GPIO temperature sensor app
-        run: |
-          # lab.flipper.net's catalog refuses installs onto this firmware —
-          # its compatibility check compares against the *official* API
-          # surface, which we've diverged from (DESFire stripped, etc., see
-          # the DESFire/protocol-strip steps above). Bundling wanted apps
-          # directly into the build sidesteps that catalog gate entirely:
-          # they're compiled against our own current SDK by our own fbt
-          # invocation below, so they're guaranteed to actually match rather
-          # than just report a version number that looks close enough.
-          #
-          # applications_user/ is fbt's standard drop-in dir for exactly
-          # this — auto-discovered by the app manifest scan, no SConstruct
-          # or menu wiring needed (see applications_user/README.md upstream).
-          git clone --depth 1 \
-            https://github.com/quen0n/unitemp-flipperzero.git \
-            flipper-fw/applications_user/unitemp
-          rm -rf flipper-fw/applications_user/unitemp/.git
-          echo "Unitemp added — reads DHT11/22, DS18B20, BMP280, HTU21+ over GPIO"
-
-      - name: Add Car Breaker 19 app (Sub-GHz)
-        run: |
-          # fbettag/car_breaker_19 — Flipper Zero RKE threat monitor that
-          # passively profiles Honda rolling-code anomalies and static-key
-          # regressions. Bundled directly (same rationale as Unitemp above:
-          # compiled against our own SDK, sidesteps the lab.flipper.net
-          # catalog gate). Its manifest ships fap_category="Research"; retag
-          # it "Sub-GHz" so it lands under Apps -> Sub-GHz as requested.
-          git clone --depth 1 \
-            https://github.com/fbettag/car_breaker_19.git \
-            flipper-fw/applications_user/car_breaker19
-          rm -rf flipper-fw/applications_user/car_breaker19/.git
-          sed -i 's/fap_category="Research"/fap_category="Sub-GHz"/' \
-            flipper-fw/applications_user/car_breaker19/application.fam
-          grep -q 'fap_category="Sub-GHz"' \
-            flipper-fw/applications_user/car_breaker19/application.fam \
-            || { echo "ERROR: car_breaker19 fap_category retag failed"; exit 1; }
-          # variable_item_list_set_header() doesn't exist in ARF's older GUI SDK
-          # (it's a newer/official-firmware API), so the app hits
-          # -Werror=implicit-function-declaration. The call only sets a cosmetic
-          # list header ("Capture Options") — drop it so the app builds on ARF.
-          sed -i '/variable_item_list_set_header/d' \
-            flipper-fw/applications_user/car_breaker19/car_breaker19.c
-          ! grep -q 'variable_item_list_set_header' \
-            flipper-fw/applications_user/car_breaker19/car_breaker19.c \
-            || { echo "ERROR: car_breaker19 header-call strip failed"; exit 1; }
-          echo "Car Breaker 19 added under Sub-GHz"
+      # Unitemp, its one_wire dependency, and Car Breaker 19 were pulled from
+      # the automated build on 2026-09-10 (flash-budget recovery after ~2
+      # weeks of upstream ARF growth pushed both variants over the 824 KB
+      # C2 boundary). Car Breaker 19 and Unitemp are both
+      # apptype=FlipperAppType.EXTERNAL — separate .fap plugins that ship in
+      # resources.ths (the SD-card bundle), never linked into firmware.dfu —
+      # so building them in CI was pure cost with zero benefit toward this
+      # check. one_wire *is* linked into firmware.elf (see git history for
+      # the target.json/SConscript patch this used to need) but existed
+      # solely for Unitemp's DS18B20 support, so it goes with it. Car
+      # Breaker 19's source is kept as a static snapshot in extra_apps/ for
+      # manual builds; see extra_apps/README.md. Unitemp: reads DHT11/22,
+      # DS18B20, BMP280, HTU21+ over GPIO — https://github.com/quen0n/unitemp-flipperzero
 
       - name: Remove vgm_console (bundled FlipperHTTP networking)
         run: |

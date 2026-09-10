@@ -1,0 +1,8 @@
+App(
+    appid="car_breaker19",
+    name="Car Breaker 19",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="car_breaker19_app",
+    requires=["gui", "storage"],
+    fap_category="Research",
+)
