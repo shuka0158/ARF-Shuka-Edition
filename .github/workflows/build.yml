@@ -181,7 +181,13 @@ jobs:
           # Remove Russian aftermarket protocols — regional, rarely encountered outside RU.
           # Scher-Khan (37 KB src), Sheriff CFM (23 KB src), Star Line (42 KB src)
           # together account for ~4–6 KB of compiled flash.
-          for proto in scher_khan sheriff_cfm star_line; do
+          #
+          # Also cut: porsche_cayenne — single luxury-model RKE variant, same
+          # "narrow real-world encounter rate" logic as the Russian aftermarket
+          # trio above. Added post-sync (2026-09-10) to recover flash margin
+          # after ~2 weeks of upstream ARF growth pushed both build variants
+          # over the 824 KB C2 boundary (nfc +3,737 B, protocols +6,569 B).
+          for proto in scher_khan sheriff_cfm star_line porsche_cayenne; do
             rm -f $PROTO/${proto}.c $PROTO/${proto}.h
             sed -i "/#include \"${proto}.h\"/d"          $PROTO/protocol_items.h
             sed -i "/subghz_protocol_${proto},/d"        $PROTO/protocol_items.c
