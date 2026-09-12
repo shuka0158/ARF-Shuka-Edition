@@ -74,8 +74,8 @@ def main():
                 app->is_desfire = false;
                 scene_manager_next_scene(app->scene_manager, MetroflipSceneParse);
                 consumed = true;
-            } else if(proto == NfcProtocolMfDesfire) {''',
-                '''            } else if(proto == NfcProtocolMfDesfire) {''',
+            } else if(proto == NfcProtocolIso14443_4a) {''',
+                '''            } else if(proto == NfcProtocolIso14443_4a) {''',
                 "metroflip_scene_auto.c menu felica branch",
             ),
         ],
