@@ -191,7 +191,16 @@ jobs:
           #   mazda_siemens — ARF also keeps mazda_v0 active; this is the
           #     older Siemens-ECU variant, dropped once porsche_cayenne alone
           #     wasn't quite enough for the protocols variant. ~2.5 KB.
-          for proto in scher_khan sheriff_cfm star_line porsche_cayenne mazda_siemens; do
+          #
+          # Round 5 cut (2026-09-12, upstream sync dev-51efff55 flash growth,
+          # continued from the gate/garage re-enable revert above): protocols
+          # variant still 5,025 B over after that revert. mitsubishi_v0 —
+          # single-brand RKE variant, same narrow-encounter-rate logic as
+          # porsche_cayenne, and the smallest remaining active protocol
+          # source file (17 KB, vs. 24-53 KB for the other single brands
+          # still active) — smallest real cut left before touching Kia,
+          # which stays untouched (restored deliberately, see history).
+          for proto in scher_khan sheriff_cfm star_line porsche_cayenne mazda_siemens mitsubishi_v0; do
             rm -f $PROTO/${proto}.c $PROTO/${proto}.h
             sed -i "/#include \"${proto}.h\"/d"          $PROTO/protocol_items.h
             sed -i "/subghz_protocol_${proto},/d"        $PROTO/protocol_items.c
