@@ -275,9 +275,9 @@ jobs:
           # gate openers, not car RKE.
           # NFC variant: re-enable nothing (toyota covered by Shuka toyota_lexus)
           # to free flash for the full DESFire/EMV NFC stack. Protocols variant:
-          # re-enable came, princeton, and toyota — kept by request; the
-          # rest of the gate/garage batch (came_atomo, came_twee, nice_flo,
-          # nice_flor_s) stays off as genuinely non-automotive dead weight.
+          # re-enable came and toyota — kept by request; the rest of the
+          # gate/garage batch (came_atomo, came_twee, nice_flo, nice_flor_s,
+          # and now princeton) stays off.
           #
           # Round 5 cut (build failure Sep 11+: upstream ARF sync dev-51efff55
           # grew the base firmware enough to blow both variants' 824 KB C2
@@ -287,14 +287,22 @@ jobs:
           # nice_flor_s/princeton) down to just toyota — same non-automotive
           # category every earlier round already cut (see Round 2/3 notes
           # above). Per request, came and princeton were restored afterward
-          # (kept as a deliberate choice, not dropped for size) while the
-          # other four stay cut. toyota is kept throughout: it's real car
-          # RKE and ARF's own toyota.c is a different variant than Shuka's
-          # toyota_lexus.c (older Corolla Verso/Tundra vs modern
-          # Toyota/Lexus 2003-2020), so both coexisting is real coverage,
-          # not duplication.
+          # (kept as a deliberate choice, not dropped for size), which
+          # reopened most of the gap; restoring mitsubishi_v0/suzuki/
+          # fiat_spa (real automotive RKE, see the strip list above) on top
+          # of that left the protocols variant 8,169 bytes over again, with
+          # every remaining SubGHz cut being either automotive (off-limits
+          # per request) or an oversized, deeply-woven NFC feature (FeliCa —
+          # its own auth subsystem in nfc_app_i.h, riskier than DESFire was)
+          # not worth the iteration risk for this gap. princeton (a generic
+          # gate-opener, not tied to any specific brand) is dropped again
+          # here instead — smaller real loss than reopening either of those.
+          # toyota is kept throughout: it's real car RKE and ARF's own
+          # toyota.c is a different variant than Shuka's toyota_lexus.c
+          # (older Corolla Verso/Tundra vs modern Toyota/Lexus 2003-2020),
+          # so both coexisting is real coverage, not duplication.
           if [ "${{ matrix.variant }}" = "protocols" ]; then
-            REENABLE="came princeton toyota"
+            REENABLE="came toyota"
           else
             REENABLE=""
           fi
