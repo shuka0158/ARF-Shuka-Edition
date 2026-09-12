@@ -261,9 +261,22 @@ jobs:
           # gate openers, not car RKE.
           # NFC variant: re-enable nothing (toyota covered by Shuka toyota_lexus)
           # to free flash for the full DESFire/EMV NFC stack. Protocols variant:
-          # re-enable the gate/garage protocols + toyota for full coverage.
+          # re-enable toyota only — automotive RKE, worth the flash cost.
+          #
+          # Round 5 cut (build failure Sep 11+: upstream ARF sync dev-51efff55
+          # grew the base firmware enough to blow both variants' 824 KB C2
+          # budget by itself, with no change on our side). The protocols
+          # variant was over by 15,625 bytes. came/came_atomo/came_twee/
+          # nice_flo/nice_flor_s/princeton are gate/garage openers, not
+          # automotive RKE — same non-automotive category every earlier round
+          # already cut for size (see Round 2/3 notes above) — so they're
+          # dropped again here instead of staying re-enabled. toyota is kept:
+          # it's real car RKE and ARF's own toyota.c is a different variant
+          # than Shuka's toyota_lexus.c (older Corolla Verso/Tundra vs modern
+          # Toyota/Lexus 2003-2020), so both coexisting is real coverage, not
+          # duplication.
           if [ "${{ matrix.variant }}" = "protocols" ]; then
-            REENABLE="came came_atomo came_twee nice_flo nice_flor_s princeton toyota"
+            REENABLE="toyota"
           else
             REENABLE=""
           fi
