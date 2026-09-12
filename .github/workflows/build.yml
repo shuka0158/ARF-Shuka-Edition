@@ -200,7 +200,14 @@ jobs:
           # source file (17 KB, vs. 24-53 KB for the other single brands
           # still active) — smallest real cut left before touching Kia,
           # which stays untouched (restored deliberately, see history).
-          for proto in scher_khan sheriff_cfm star_line porsche_cayenne mazda_siemens mitsubishi_v0; do
+          # mitsubishi_v0 alone only bought back 1,264 B (still 3,761 B
+          # over) — none of its functions were big enough to show up
+          # individually in the size diagnostic's top-80, meaning suzuki
+          # and fiat_spa (also absent from that top-80) are similarly
+          # small per-cut. Both dropped together here, same reasoning,
+          # to clear the remaining gap without another slow build
+          # round-trip for a partial win.
+          for proto in scher_khan sheriff_cfm star_line porsche_cayenne mazda_siemens mitsubishi_v0 suzuki fiat_spa; do
             rm -f $PROTO/${proto}.c $PROTO/${proto}.h
             sed -i "/#include \"${proto}.h\"/d"          $PROTO/protocol_items.h
             sed -i "/subghz_protocol_${proto},/d"        $PROTO/protocol_items.c
