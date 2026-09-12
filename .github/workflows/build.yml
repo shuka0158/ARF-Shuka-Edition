@@ -493,6 +493,131 @@ jobs:
             "$REPO/applications/main/nfc"
           echo "NFC stripped-protocol crash guard applied."
 
+      - name: Strip FeliCa (Suica) NFC support (issue #9 flash budget)
+        if: ${{ matrix.variant == 'protocols' }}
+        run: |
+          # ~11 KB of firmware.dfu (felica_ prefix in the size diagnostic).
+          # protocols variant was still 6,049 bytes over the 824 KB C2
+          # boundary after every other lever (came/princeton/toyota,
+          # mitsubishi_v0/suzuki/fiat_spa kept as real automotive RKE per
+          # request; Hitag2 brute-force ruled out — it cracks Fiat/Renault
+          # keys; every other SubGHz protocol left is a common brand that
+          # survived every prior cut round). FeliCa is the last non-
+          # automotive weight left, chosen anyway despite real feature loss:
+          # kills live FeliCa reading AND Suica (Japan transit card)
+          # support, including re-opening previously saved Suica dumps —
+          # per explicit request to accept that over cutting more
+          # automotive protocols.
+          #
+          # Same surgical pattern as the DESFire/EMV strips above, but wider:
+          # FeliCa is registered in lib/nfc's poller AND device AND listener
+          # tables (it supports emulation, unlike DESFire/EMV), has its own
+          # auth context (felica_auth) alloc/free'd from the main NFC app's
+          # core lifecycle in nfc_app.c — not FeliCa-plugin-specific — and
+          # is a real functional dependency (not just an enum comparison) of
+          # Metroflip's Suica plugin and the aic.c NFC plugin.
+          REPO=flipper-fw
+          SHUKA=shuka-edition
+
+          sed -i '/felica/Id' "$REPO/targets/f7/api_symbols.csv"
+
+          # ── Core protocol library ──
+          rm -rf "$REPO/lib/nfc/protocols/felica"
+          # lib/nfc/helpers/felica_crc.{c,h} lives outside protocols/felica/
+          # and is picked up by lib/nfc's own GlobRecursive("*.c*") — dead
+          # weight once felica.c/felica_listener_i.c (its only real callers)
+          # are gone.
+          rm -f "$REPO/lib/nfc/helpers/felica_crc.c" "$REPO/lib/nfc/helpers/felica_crc.h"
+
+          NFC_DEVICE_DEFS=$REPO/lib/nfc/protocols/nfc_device_defs.c
+          sed -i '/#include <nfc\/protocols\/felica\/felica.h>/d' "$NFC_DEVICE_DEFS"
+          sed -i '/\[NfcProtocolFelica\] = &nfc_device_felica,/d'  "$NFC_DEVICE_DEFS"
+
+          NFC_POLLER_DEFS=$REPO/lib/nfc/protocols/nfc_poller_defs.c
+          sed -i '/#include <nfc\/protocols\/felica\/felica_poller_defs.h>/d' "$NFC_POLLER_DEFS"
+          sed -i '/\[NfcProtocolFelica\] = &nfc_poller_felica,/d'             "$NFC_POLLER_DEFS"
+
+          # FeliCa supports emulation (unlike DESFire/EMV) — also drop its
+          # listener table entry.
+          NFC_LISTENER_DEFS=$REPO/lib/nfc/protocols/nfc_listener_defs.c
+          sed -i '/#include <nfc\/protocols\/felica\/felica_listener_defs.h>/d' "$NFC_LISTENER_DEFS"
+          sed -i '/\[NfcProtocolFelica\] = &nfc_listener_felica,/d'             "$NFC_LISTENER_DEFS"
+
+          # nfc_protocol.c: FeliCa is its own top-level parent/children config
+          # block (like EMV's, not a one-liner like DESFire's own entry).
+          sed -i '/\[NfcProtocolFelica\] =/,/^        },$/d' "$REPO/lib/nfc/protocols/nfc_protocol.c"
+
+          sed -i '/File("protocols\/felica\/felica.h"),/d'             "$REPO/lib/nfc/SConscript"
+          sed -i '/File("protocols\/felica\/felica_poller.h"),/d'      "$REPO/lib/nfc/SConscript"
+          sed -i '/File("protocols\/felica\/felica_listener.h"),/d'    "$REPO/lib/nfc/SConscript"
+          sed -i '/File("protocols\/felica\/felica_poller_sync.h"),/d' "$REPO/lib/nfc/SConscript"
+          sed -i '/File("helpers\/felica_crc.h"),/d'                   "$REPO/lib/nfc/SConscript"
+
+          # ── felica_auth: its own auth context, alloc/free'd from the main
+          # NFC app's lifecycle (nfc_app.c), not FeliCa-plugin-specific ──
+          NFC=$REPO/applications/main/nfc
+          sed -i '/#include "helpers\/felica_auth.h"/d'          "$NFC/nfc_app_i.h"
+          sed -i '/FelicaAuthenticationContext\* felica_auth;/d' "$NFC/nfc_app_i.h"
+          sed -i '/instance->felica_auth = felica_auth_alloc();/d' "$NFC/nfc_app.c"
+          sed -i '/felica_auth_free(instance->felica_auth);/d'     "$NFC/nfc_app.c"
+          rm -f "$NFC/helpers/felica_auth.c" "$NFC/helpers/felica_auth.h"
+
+          # nfc_scene_des_auth_key_input.c / nfc_scene_des_auth_unlock_warn.c
+          # aren't FeliCa-specific despite the name — they're the shared
+          # manual-3DES-key entry/confirm flow for FeliCa AND Mifare
+          # Ultralight-C. Drop the FeliCa branch, Ultralight-only from here.
+          python3 "$SHUKA/scripts/patch_nfc_no_felica_auth.py" "$NFC"
+
+          # ── Main NFC app: FeliCa protocol-support plugin, dedicated
+          # scenes, CLI handlers, and the FeliCa-only transit-card plugin ──
+          rm -rf "$NFC/helpers/protocol_support/felica"
+          rm -f "$NFC/scenes/nfc_scene_felica_system.c"
+          rm -f "$NFC/scenes/nfc_scene_felica_more_info.c"
+          rm -f "$NFC/plugins/supported_cards/aic.c"
+          rm -rf "$NFC/cli/commands/raw/protocol_handlers/felica"
+          rm -rf "$NFC/cli/commands/dump/protocols/felica"
+
+          sed -i '/ADD_SCENE(nfc, felica_more_info, FelicaMoreInfo)/d' "$NFC/scenes/nfc_scene_config.h"
+          sed -i '/ADD_SCENE(nfc, felica_system, FelicaSystem)/d'      "$NFC/scenes/nfc_scene_config.h"
+          sed -i '/\[NfcProtocolFelica\] = "felica",/d' "$NFC/helpers/protocol_support/nfc_protocol_support.c"
+          sed -i '/\[NfcProtocolFelica\] = "FeliCa",/d'  "$NFC/cli/commands/helpers/nfc_cli_format.c"
+
+          # nfc_cli_dump_common_types.h #includes felica.h just for the
+          # FelicaCardKey union member — drop both, or every CLI dump file
+          # that transitively includes this header fails to compile.
+          COMMON_TYPES=$NFC/cli/commands/dump/protocols/nfc_cli_dump_common_types.h
+          sed -i '/#include <nfc\/protocols\/felica\/felica.h>/d' "$COMMON_TYPES"
+          sed -i '/FelicaCardKey felica_key;/d'                   "$COMMON_TYPES"
+
+          # application.fam lists the two felica CLI handler sources by exact
+          # path (not a glob) for the main "nfc" app — already rm -f'd above,
+          # so scons would hard-fail on a missing source file otherwise.
+          sed -i '\|"cli/commands/raw/protocol_handlers/felica/nfc_cli_raw_felica.c",|d'  "$NFC/application.fam"
+          sed -i '\|"cli/commands/dump/protocols/felica/nfc_cli_dump_felica.c",|d'        "$NFC/application.fam"
+
+          sed -i '/#include "protocol_handlers\/felica\/nfc_cli_raw_felica.h"/d' "$NFC/cli/commands/raw/nfc_cli_command_raw.c"
+          sed -i '/\[NfcProtocolFelica\] = nfc_cli_raw_felica_handler,/d'        "$NFC/cli/commands/raw/nfc_cli_command_raw.c"
+          sed -i '/{\.name = "felica", \.value = NfcProtocolFelica},/d'         "$NFC/cli/commands/raw/nfc_cli_command_raw.c"
+
+          sed -i '/#include "protocols\/felica\/nfc_cli_dump_felica.h"/d'          "$NFC/cli/commands/dump/nfc_cli_command_dump.c"
+          sed -i '/\[NfcProtocolFelica\] = nfc_cli_dump_poller_callback_felica,/d' "$NFC/cli/commands/dump/nfc_cli_command_dump.c"
+          sed -i '/{\.name = "felica", \.value = NfcProtocolFelica},/d'           "$NFC/cli/commands/dump/nfc_cli_command_dump.c"
+
+          sed -i '/^    NfcProtocolFelica,$/d' "$NFC/cli/commands/nfc_cli_command_emulate.c"
+
+          python3 "$SHUKA/scripts/remove_fam_apps.py" "$NFC/application.fam" \
+            nfc_felica aic_parser
+
+          # ── Metroflip: Suica plugin + shared scene glue ──
+          METROFLIP=$REPO/applications/system/metroflip
+          rm -f "$METROFLIP/scenes/plugins/suica.c"
+          rm -f "$METROFLIP/api/suica/suica_loading.h" "$METROFLIP/api/suica/suica_drawings.h"
+          python3 "$SHUKA/scripts/patch_metroflip_no_felica.py" "$METROFLIP"
+          python3 "$SHUKA/scripts/remove_fam_apps.py" "$METROFLIP/application.fam" \
+            suica_plugin
+
+          echo "FeliCa (Suica) support stripped."
+
       - name: Add Shuka-Edition protocols on top of ARF
         run: |
           REPO=flipper-fw
