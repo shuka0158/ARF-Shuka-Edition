@@ -477,16 +477,20 @@ jobs:
 
           echo "EMV support stripped."
 
-      - name: Harden NFC app against stripped protocols (DESFire/EMV crash fix)
-        if: ${{ matrix.variant == 'protocols' }}
+      - name: Harden NFC app against stripped protocols (DESFire/EMV/FeliCa crash fix)
         run: |
-          # DESFire and EMV are removed from the poller/device tables and from
-          # nfc_protocol_support_plugin_names[] above, but stay defined in the
-          # NfcProtocol enum. Reaching one of them in nfc_protocol_support_alloc
-          # formats a plugin path with a NULL "%s" and hard-faults the firmware
-          # ("Flipper crashed and was rebooted NULL pointer dereference"), which
-          # "Read Specific Card Type" triggers directly (it lists every enum
-          # protocol). Guard the alloc and hide stripped protocols from that menu.
+          # DESFire, EMV (protocols variant only) and FeliCa (both variants,
+          # see the strip step below) are removed from the poller/device
+          # tables and from nfc_protocol_support_plugin_names[], but stay
+          # defined in the NfcProtocol enum. Reaching one of them in
+          # nfc_protocol_support_alloc formats a plugin path with a NULL "%s"
+          # and hard-faults the firmware ("Flipper crashed and was rebooted
+          # NULL pointer dereference"), which "Read Specific Card Type"
+          # triggers directly (it lists every enum protocol). Guard the alloc
+          # and hide stripped protocols from that menu. Unconditional now
+          # (used to be protocols-only): the guard is generic and harmless to
+          # apply even where nothing is stripped yet, and both variants strip
+          # at least FeliCa.
           REPO=flipper-fw
           SHUKA=shuka-edition
           python3 "$SHUKA/scripts/patch_nfc_stripped_protocol_crash.py" \
@@ -494,20 +498,27 @@ jobs:
           echo "NFC stripped-protocol crash guard applied."
 
       - name: Strip FeliCa (Suica) NFC support (issue #9 flash budget)
-        if: ${{ matrix.variant == 'protocols' }}
         run: |
           # ~11 KB of firmware.dfu (felica_ prefix in the size diagnostic).
-          # protocols variant was still 6,049 bytes over the 824 KB C2
-          # boundary after every other lever (came/princeton/toyota,
-          # mitsubishi_v0/suzuki/fiat_spa kept as real automotive RKE per
-          # request; Hitag2 brute-force ruled out — it cracks Fiat/Renault
-          # keys; every other SubGHz protocol left is a common brand that
-          # survived every prior cut round). FeliCa is the last non-
-          # automotive weight left, chosen anyway despite real feature loss:
-          # kills live FeliCa reading AND Suica (Japan transit card)
-          # support, including re-opening previously saved Suica dumps —
-          # per explicit request to accept that over cutting more
+          # Originally protocols-variant only: that build was still 6,049
+          # bytes over the 824 KB C2 boundary after every other lever
+          # (came/princeton/toyota, mitsubishi_v0/suzuki/fiat_spa kept as
+          # real automotive RKE per request; Hitag2 brute-force ruled out —
+          # it cracks Fiat/Renault keys; every other SubGHz protocol left is
+          # a common brand that survived every prior cut round). FeliCa was
+          # the last non-automotive weight left, chosen anyway despite real
+          # feature loss: kills live FeliCa reading AND Suica (Japan transit
+          # card) support, including re-opening previously saved Suica
+          # dumps — per explicit request to accept that over cutting more
           # automotive protocols.
+          #
+          # Now unconditional (both variants): nfc variant hit its own
+          # 11,505-byte overage after a later upstream sync, and FeliCa was
+          # never actually part of that variant's "keep the full DESFire/EMV
+          # stack" promise — it's unrelated size that happened to need
+          # cutting once nfc's own budget ran out too. See
+          # patch_metroflip_no_felica.py's replace_variant for the one place
+          # this genuinely differs by variant (DESFire stripped or not).
           #
           # Same surgical pattern as the DESFire/EMV strips above, but wider:
           # FeliCa is registered in lib/nfc's poller AND device AND listener

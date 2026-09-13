@@ -9,12 +9,18 @@ removed by the caller of this script, same as Opal/Myki/Clipper/Nol/ITSO
 were for the DESFire strip; this script only handles the shared scene
 files that reference FeliCa alongside other, kept protocols.
 
-Must run after patch_metroflip_no_desfire.py in the same build (this
-project already strips DESFire from every "protocols" build): that script
-removes the DESFire branches immediately preceding each FeliCa branch here,
-but every edit below matches on the FeliCa-specific block content only, so
-order doesn't actually matter for correctness — noted for context, not a
-real dependency.
+Runs in both build variants now (FeliCa was never part of the "nfc variant
+keeps the full DESFire/EMV stack" promise — it's just unrelated size that
+happened to also need cutting once nfc's own budget ran out). That matters
+for one edit specifically: metroflip_scene_auto.c's menu dispatch has the
+FeliCa branch immediately followed by the Mifare DESFire branch in
+upstream ARF. In the "protocols" variant, patch_metroflip_no_desfire.py
+already ran and collapsed that DESFire branch away, so FeliCa's block is
+followed by NfcProtocolIso14443_4a instead. In the "nfc" variant, DESFire
+is never stripped, so the original NfcProtocolMfDesfire trailing context
+is still there. `replace_variant` below tries both known-valid trailing
+contexts and uses whichever one actually matches — still fails loudly if
+neither does (upstream changed shape), same as every other patch here.
 
 Exact-text surgery, same defensive style as this project's other
 patch_*.py scripts: fails loudly if upstream Metroflip source has changed
@@ -38,10 +44,31 @@ def replace_once(content, old, new, label, path):
     return content.replace(old, new)
 
 
+def replace_variant(content, pairs, label, path):
+    """Like replace_once, but tries several possible (old, new) pairs (for
+    text whose exact shape depends on which other strip steps already ran)
+    and applies whichever `old` is present exactly once. Fails loudly only
+    if none of the candidates match — same guarantee as replace_once."""
+    matches = [(old, new) for old, new in pairs if content.count(old) == 1]
+    if len(matches) != 1:
+        raise SystemExit(
+            f"ERROR: expected exactly 1 of {len(pairs)} candidate texts for {label!r} "
+            f"to match exactly once in {path}, found {len(matches)} — upstream changed shape, "
+            "patch needs updating"
+        )
+    old, new = matches[0]
+    return content.replace(old, new)
+
+
 def patch_file(path, edits):
     content = path.read_text(encoding="utf-8")
-    for old, new, label in edits:
-        content = replace_once(content, old, new, label, path)
+    for edit in edits:
+        if len(edit) == 3:
+            old, new, label = edit
+            content = replace_once(content, old, new, label, path)
+        else:
+            pairs, label = edit
+            content = replace_variant(content, pairs, label, path)
     path.write_text(content, encoding="utf-8")
     print(f"Patched {path}")
 
@@ -67,7 +94,23 @@ def main():
                 "metroflip_scene_auto.c scan-detect felica branch",
             ),
             (
-                '''            } else if(proto == NfcProtocolFelica) {
+                [
+                    # nfc variant: DESFire not stripped, original trailing context.
+                    (
+                        '''            } else if(proto == NfcProtocolFelica) {
+                popup_set_header(
+                    popup, "FeliCa card\\ndetected!\\nReading...", 68, 30, AlignLeft, AlignTop);
+                app->card_type = "suica";
+                app->is_desfire = false;
+                scene_manager_next_scene(app->scene_manager, MetroflipSceneParse);
+                consumed = true;
+            } else if(proto == NfcProtocolMfDesfire) {''',
+                        '''            } else if(proto == NfcProtocolMfDesfire) {''',
+                    ),
+                    # protocols variant: patch_metroflip_no_desfire.py already
+                    # collapsed the DESFire branch away.
+                    (
+                        '''            } else if(proto == NfcProtocolFelica) {
                 popup_set_header(
                     popup, "FeliCa card\\ndetected!\\nReading...", 68, 30, AlignLeft, AlignTop);
                 app->card_type = "suica";
@@ -75,7 +118,9 @@ def main():
                 scene_manager_next_scene(app->scene_manager, MetroflipSceneParse);
                 consumed = true;
             } else if(proto == NfcProtocolIso14443_4a) {''',
-                '''            } else if(proto == NfcProtocolIso14443_4a) {''',
+                        '''            } else if(proto == NfcProtocolIso14443_4a) {''',
+                    ),
+                ],
                 "metroflip_scene_auto.c menu felica branch",
             ),
         ],
