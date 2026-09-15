@@ -1026,7 +1026,7 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     steps:
@@ -1066,8 +1066,8 @@ jobs:
           [ -n "$pro_d" ] && cp "$pro_d" "$docs/latest-full-protocols.dfu"
           printf '%s\n%s\n%s\n' "$SHORT_SHA" "$ARF_TAG" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$docs/latest-build.txt"
 
-      - name: Commit docs (main push only)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Commit docs (main only)
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         run: |
           cd shuka-edition
           git config user.name  "github-actions[bot]"
