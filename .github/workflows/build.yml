@@ -42,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [nfc, protocols]   # nfc=full DESFire/EMV NFC stack; protocols=all SubGHz protocols
+        variant: [protocols]   # nfc variant dropped: perpetual flash-budget fight not worth it, protocols-only from here
 
     steps:
       - name: Checkout ARF-Shuka-Edition
@@ -1040,7 +1040,7 @@ jobs:
         with:
           path: dl
 
-      - name: Assemble release + docs (both variants)
+      - name: Assemble release + docs (protocols variant)
         id: assemble
         run: |
           set -e
@@ -1053,17 +1053,11 @@ jobs:
           find dl -type f \( -name '*.tgz' -o -name '*.dfu' -o -name '*.zip' \) -exec cp -n {} release/ \;
           echo "=== release assets ==="; ls -lh release/
 
-          # web-flash: publish both variant bundles/DFUs, and keep the NFC variant
-          # as the default latest-* (recommended: NFC works).
           docs=shuka-edition/docs
-          nfc_b=$(ls release/flipper-z-f7-update-arf-shuka-edition-nfc.tgz 2>/dev/null || true)
           pro_b=$(ls release/flipper-z-f7-update-arf-shuka-edition-protocols.tgz 2>/dev/null || true)
-          nfc_d=$(ls release/flipper-z-f7-full-arf-shuka-edition-nfc.dfu 2>/dev/null || true)
           pro_d=$(ls release/flipper-z-f7-full-arf-shuka-edition-protocols.dfu 2>/dev/null || true)
-          [ -n "$nfc_b" ] && cp "$nfc_b" "$docs/latest-update-nfc.tgz"       && cp "$nfc_b" "$docs/latest-update.tgz"
-          [ -n "$pro_b" ] && cp "$pro_b" "$docs/latest-update-protocols.tgz"
-          [ -n "$nfc_d" ] && cp "$nfc_d" "$docs/latest-full-nfc.dfu"         && cp "$nfc_d" "$docs/latest-full.dfu"
-          [ -n "$pro_d" ] && cp "$pro_d" "$docs/latest-full-protocols.dfu"
+          [ -n "$pro_b" ] && cp "$pro_b" "$docs/latest-update-protocols.tgz" && cp "$pro_b" "$docs/latest-update.tgz"
+          [ -n "$pro_d" ] && cp "$pro_d" "$docs/latest-full-protocols.dfu"   && cp "$pro_d" "$docs/latest-full.dfu"
           printf '%s\n%s\n%s\n' "$SHORT_SHA" "$ARF_TAG" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$docs/latest-build.txt"
 
       - name: Commit docs (main push only)
@@ -1073,13 +1067,13 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/ 2>/dev/null || true
-          git commit -m "ci: publish OTA bundles (nfc+protocols) ${GITHUB_SHA:0:7} [skip ci]" || { echo "Nothing to commit"; exit 0; }
+          git commit -m "ci: publish OTA bundle (protocols) ${GITHUB_SHA:0:7} [skip ci]" || { echo "Nothing to commit"; exit 0; }
           for try in 1 2 3; do
             git pull --rebase --autostash origin main && git push && break
             echo "push retry $try"; sleep 3
           done
 
-      - name: Create GitHub Release (both variants)
+      - name: Create GitHub Release (protocols variant)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || steps.assemble.outputs.short_sha }}
@@ -1092,16 +1086,7 @@ jobs:
 
             **Based on ARF:** `${{ steps.assemble.outputs.arf_tag }}`
 
-            This release ships **two firmware variants** — pick one:
-
-            ### 🟢 NFC variant (recommended) — `*-nfc.*`
-            Full DESFire/EMV NFC stack: **NFC auto-detect (Read) works** on bank/DESFire/ISO14443-4A cards.
-            Trade-off: omits 6 gate/garage SubGHz protocols (came/nice/princeton), ARF `toyota`
-            (covered by `toyota_lexus`), and the 4 oldest Kia RKE variants (v0–v4; v5/v6/v7 kept).
-            - OTA (firmware + apps): `flipper-z-f7-update-arf-shuka-edition-nfc.tgz`
-            - Firmware only: `flipper-z-f7-full-arf-shuka-edition-nfc.dfu`
-
-            ### 🔵 Protocols variant — `*-protocols.*`
+            ### Protocols variant — `*-protocols.*`
             **All SubGHz protocols present** (full automotive coverage). Trade-off: NFC auto-detect
             **crashes on ISO14443-4A cards** (DESFire/EMV stripped for flash). "Read Specific Card
             Type" still works.
@@ -1112,4 +1097,4 @@ jobs:
             qFlipper → Install from file → the `.tgz` (firmware + apps) or `.dfu` (firmware only).
 
             ### Animations
-            NSFW animations are embedded in each OTA bundle; download `NSFW-Shuka-animations.zip` to copy manually.
+            NSFW animations are embedded in the OTA bundle; download `NSFW-Shuka-animations.zip` to copy manually.
