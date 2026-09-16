@@ -1,6 +1,8 @@
 #include <furi.h>
 #include <gui/gui.h>
 #include <input/input.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <assets_icons.h>
 #include <dolphin/dolphin.h>
@@ -160,9 +162,14 @@ int32_t passport_app(void* p) {
     uint32_t xp_to_go = dolphin_state_xp_to_levelup(stats.icounter);
     model.xp_span = (model.level >= 3) ? 0 : (model.xp_above + xp_to_go);
 
-    DesktopSettings settings = {0};
-    desktop_settings_load(&settings);
-    model.passport_char = settings.passport_char;
+    // Heap-allocated: DesktopSettings is ~650 bytes (5x 128-byte favorite-app
+    // slots) and this app's stack is small — a stack-local copy here caused
+    // an MPU fault (stack overflow) on real hardware.
+    DesktopSettings* settings = malloc(sizeof(DesktopSettings));
+    memset(settings, 0, sizeof(DesktopSettings));
+    desktop_settings_load(settings);
+    model.passport_char = settings->passport_char;
+    free(settings);
 
     FuriMessageQueue* event_queue = furi_message_queue_alloc(8, sizeof(InputEvent));
 
