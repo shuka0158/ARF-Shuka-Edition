@@ -321,6 +321,13 @@ jobs:
           ENABLED=$(grep -c "^\s*&subghz_protocol_" "$PROTO_ITEMS" || true)
           echo "Total active protocol entries: ${ENABLED}"
 
+      - name: Strip Hitag2 BF (flash budget for Passport screen)
+        run: |
+          # Fiat-BCM Hell brute force ([HITAG2_BF]) removed to make room for the
+          # Passport app's icons/code. Leaves [HITAG2_SEED] (Renault V1 classic
+          # seed brute force) untouched — fully separate code path.
+          python3 shuka-edition/scripts/strip_hitag2_bf.py flipper-fw
+
       - name: Strip Mifare DESFire support (issue #9 flash budget)
         if: ${{ matrix.variant == 'protocols' }}
         run: |
