@@ -78,8 +78,7 @@ def main():
                     1)) {
                 instance->custom_car_emulate = false;
                 flipper_format_rewind(fff_data_file);
-            }
-            FuriString* filter_str = furi_string_alloc();''',
+            }''',
                 '''             if(!flipper_format_read_bool(
                     fff_data_file,
                     SUBGHZ_LAST_SETTING_FIELD_CUSTOM_CAR_EMULATE,
@@ -95,8 +94,7 @@ def main():
                     1)) {
                 instance->rx_led_indicator = true;
                 flipper_format_rewind(fff_data_file);
-            }
-            FuriString* filter_str = furi_string_alloc();''',
+            }''',
                 "load field read",
             ),
             (
@@ -106,8 +104,7 @@ def main():
                &instance->custom_car_emulate,
                1)) {
             break;
-        }
-        if(!flipper_format_write_string_cstr(''',
+        }''',
                 '''        if(!flipper_format_write_bool(
                file,
                SUBGHZ_LAST_SETTING_FIELD_CUSTOM_CAR_EMULATE,
@@ -121,8 +118,7 @@ def main():
                &instance->rx_led_indicator,
                1)) {
             break;
-        }
-        if(!flipper_format_write_string_cstr(''',
+        }''',
                 "save field write",
             ),
         ],
