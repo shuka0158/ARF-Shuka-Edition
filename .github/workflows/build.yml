@@ -764,15 +764,17 @@ jobs:
           sudo apt-get install -y python3-pip scons gcc-arm-none-eabi
           cd flipper-fw
           python3 -m pip install --upgrade pip
-          pip3 install pyserial protobuf heatshrink2 Pillow
+          pip3 install pyserial protobuf heatshrink2
 
-      - name: Generate Passport custom character icons
+      - name: Install Passport custom character icons
         run: |
-          # fbt compiles every PNG under assets/icons/<Group>/ automatically, no
-          # manifest needed — drop the generated art straight into the same
-          # Passport group as the stock dolphin passport_*.png icons so both
-          # ship in the same I_<name> icon table (see patch_passport.py).
-          python3 shuka-edition/scripts/generate_passport_chars.py flipper-fw/assets/icons/Passport
+          # Real hand-drawn art (assets/passport_chars/, see its README for
+          # provenance/license), not generated. fbt compiles every PNG under
+          # assets/icons/<Group>/ automatically, no manifest needed — this
+          # drops it straight into the same Passport group as the stock
+          # dolphin passport_*.png icons so both ship in the same I_<name>
+          # icon table.
+          python3 shuka-edition/scripts/install_passport_chars.py flipper-fw
 
       - name: Clear stock external animations (NSFW-only pack)
         run: |
