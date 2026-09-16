@@ -123,6 +123,10 @@ jobs:
           done
           echo "Modified files applied"
 
+      - name: Register Passport app with the Settings metapackage
+        run: |
+          python3 shuka-edition/scripts/patch_passport_menu_entry.py flipper-fw
+
       - name: Apply verified PSA decoder fixes
         run: |
           # psa.c already exists in upstream ARF, so it can't go through
