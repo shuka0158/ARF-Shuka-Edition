@@ -6,6 +6,7 @@
 
 #include <assets_icons.h>
 #include <dolphin/dolphin.h>
+#include <dolphin/helpers/dolphin_state.h>
 #include <furi_hal_version.h>
 #include <desktop/desktop_settings.h>
 
@@ -19,7 +20,20 @@ typedef struct {
     uint8_t mood; // 0=happy, 1=okay, 2=bad
     uint8_t passport_char; // 0=dolphin, 1=skull, 2=neuromancer, 3=robot
     const char* name; // furi_hal_version_get_name_ptr() — static buffer, lives for app lifetime
+    uint32_t xp_above; // XP earned since the last level-up
+    uint32_t xp_span; // xp_above + xp still needed for this level; 0 at max level
 } PassportModel;
+
+static const char* mood_text(uint8_t mood) {
+    switch(mood) {
+    case 0:
+        return "Happy";
+    case 1:
+        return "Okay";
+    default:
+        return "Grumpy";
+    }
+}
 
 static const Icon* passport_icon(const PassportModel* m) {
     // Built-in dolphin art scales with level (1/2/3); the custom characters
@@ -104,6 +118,21 @@ static void passport_draw_callback(Canvas* canvas, void* ctx) {
     canvas_draw_str(canvas, 54, 11, m->name ? m->name : "Flipper");
 
     canvas_set_font(canvas, FontSecondary);
+    FuriString* mood = furi_string_alloc_printf("Mood: %s", mood_text(m->mood));
+    canvas_draw_str(canvas, 54, 23, furi_string_get_cstr(mood));
+    furi_string_free(mood);
+
+    // XP bar toward next level (full and static once level 3 is reached)
+    const uint8_t bar_x = 54, bar_y = 30, bar_w = 70, bar_h = 6;
+    canvas_draw_frame(canvas, bar_x, bar_y, bar_w, bar_h);
+    uint8_t fill = bar_w - 2;
+    if(m->xp_span > 0) {
+        fill = (uint8_t)(((uint64_t)m->xp_above * (bar_w - 2)) / m->xp_span);
+    }
+    if(fill > 0) {
+        canvas_draw_box(canvas, bar_x + 1, bar_y + 1, fill, bar_h - 2);
+    }
+
     canvas_set_color(canvas, ColorWhite);
     FuriString* lvl = furi_string_alloc_printf("Lvl. %u", m->level);
     canvas_draw_str(canvas, 65, 53, furi_string_get_cstr(lvl));
@@ -129,6 +158,9 @@ int32_t passport_app(void* p) {
                  (stats.butthurt <= MOOD_OKAY_MAX)   ? 1 :
                                                         2;
     model.name = furi_hal_version_get_name_ptr();
+    model.xp_above = dolphin_state_xp_above_last_levelup(stats.icounter);
+    uint32_t xp_to_go = dolphin_state_xp_to_levelup(stats.icounter);
+    model.xp_span = (model.level >= 3) ? 0 : (model.xp_above + xp_to_go);
 
     // Heap-allocated: DesktopSettings is ~650 bytes (5x 128-byte favorite-app
     // slots) and this app's stack is small — a stack-local copy here caused
