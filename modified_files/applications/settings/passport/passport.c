@@ -6,7 +6,7 @@
 
 #include <assets_icons.h>
 #include <dolphin/dolphin.h>
-#include <dolphin/helpers/dolphin_state.h>
+#include <furi_hal_version.h>
 #include <desktop/desktop_settings.h>
 
 // Mood buckets, mirroring how the rest of the firmware reads butthurt
@@ -18,9 +18,7 @@ typedef struct {
     uint8_t level; // 1..3, matches dolphin_get_level() / passport_*N_46x49 variants
     uint8_t mood; // 0=happy, 1=okay, 2=bad
     uint8_t passport_char; // 0=dolphin, 1=skull, 2=neuromancer, 3=robot
-    uint32_t icounter;
-    uint32_t xp_above;
-    uint32_t xp_span; // xp_above + xp still needed for this level; 0 at max level
+    const char* name; // furi_hal_version_get_name_ptr() — static buffer, lives for app lifetime
 } PassportModel;
 
 static const Icon* passport_icon(const PassportModel* m) {
@@ -88,55 +86,28 @@ static const Icon* passport_icon(const PassportModel* m) {
     }
 }
 
-static const char* mood_text(uint8_t mood) {
-    switch(mood) {
-    case 0:
-        return "Happy";
-    case 1:
-        return "Okay";
-    default:
-        return "Grumpy";
-    }
-}
-
 static void passport_draw_callback(Canvas* canvas, void* ctx) {
     const PassportModel* m = ctx;
 
     canvas_clear(canvas);
     canvas_set_color(canvas, ColorBlack);
 
-    canvas_draw_icon(canvas, 4, 8, passport_icon(m));
+    // Same three-piece layout as stock Flipper passport: character icon,
+    // the booklet's perforated divider, and the bottom stamp strip with
+    // its "Lvl." badge — using ARF's own (unused until now) passport_left
+    // and passport_bottom assets instead of a hand-rolled frame.
+    canvas_draw_icon(canvas, 0, 0, passport_icon(m));
+    canvas_draw_icon(canvas, 46, 0, &I_passport_left_6x46);
+    canvas_draw_icon(canvas, 0, 46, &I_passport_bottom_128x18);
 
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 58, 12, "Passport");
+    canvas_draw_str(canvas, 54, 11, m->name ? m->name : "Flipper");
 
     canvas_set_font(canvas, FontSecondary);
-
-    FuriString* line = furi_string_alloc();
-
-    furi_string_printf(line, "Level: %u", m->level);
-    canvas_draw_str(canvas, 58, 24, furi_string_get_cstr(line));
-
-    furi_string_printf(line, "Mood: %s", mood_text(m->mood));
-    canvas_draw_str(canvas, 58, 34, furi_string_get_cstr(line));
-
-    furi_string_printf(line, "XP: %lu", (unsigned long)m->icounter);
-    canvas_draw_str(canvas, 58, 44, furi_string_get_cstr(line));
-
-    furi_string_free(line);
-
-    // XP bar toward next level (full and static once level 3 is reached)
-    const uint8_t bar_x = 58, bar_y = 50, bar_w = 64, bar_h = 6;
-    canvas_draw_frame(canvas, bar_x, bar_y, bar_w, bar_h);
-    uint8_t fill = bar_w - 2;
-    if(m->xp_span > 0) {
-        fill = (uint8_t)(((uint64_t)m->xp_above * (bar_w - 2)) / m->xp_span);
-    }
-    if(fill > 0) {
-        canvas_draw_box(canvas, bar_x + 1, bar_y + 1, fill, bar_h - 2);
-    }
-
-    canvas_draw_str(canvas, 4, 62, "Back: exit");
+    canvas_set_color(canvas, ColorWhite);
+    FuriString* lvl = furi_string_alloc_printf("Lvl. %u", m->level);
+    canvas_draw_str(canvas, 65, 53, furi_string_get_cstr(lvl));
+    furi_string_free(lvl);
 }
 
 static void passport_input_callback(InputEvent* input_event, void* ctx) {
@@ -153,14 +124,11 @@ int32_t passport_app(void* p) {
     DolphinStats stats = dolphin_stats(dolphin);
     furi_record_close(RECORD_DOLPHIN);
 
-    model.icounter = stats.icounter;
     model.level = stats.level;
     model.mood = (stats.butthurt <= MOOD_HAPPY_MAX) ? 0 :
                  (stats.butthurt <= MOOD_OKAY_MAX)   ? 1 :
                                                         2;
-    model.xp_above = dolphin_state_xp_above_last_levelup(stats.icounter);
-    uint32_t xp_to_go = dolphin_state_xp_to_levelup(stats.icounter);
-    model.xp_span = (model.level >= 3) ? 0 : (model.xp_above + xp_to_go);
+    model.name = furi_hal_version_get_name_ptr();
 
     // Heap-allocated: DesktopSettings is ~650 bytes (5x 128-byte favorite-app
     // slots) and this app's stack is small — a stack-local copy here caused
