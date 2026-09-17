@@ -17,7 +17,7 @@
 typedef struct {
     uint8_t level; // 1..3, matches dolphin_get_level() / passport_*N_46x49 variants
     uint8_t mood; // 0=happy, 1=okay, 2=bad
-    uint8_t passport_char; // 0=dolphin, 1=skull, 2=hacker, 3=robot
+    uint8_t passport_char; // 0=dolphin, 1=skull, 2=neuromancer, 3=robot
     uint32_t icounter;
     uint32_t xp_above;
     uint32_t xp_span; // xp_above + xp still needed for this level; 0 at max level
@@ -37,7 +37,7 @@ static const Icon* passport_icon(const PassportModel* m) {
         default:
             return &I_skull_bad1_46x49;
         }
-    case 2: // hacker
+    case 2: // neuromancer (internal symbols kept as I_hacker_* — cosmetic label only)
         switch(m->mood) {
         case 0:
             return &I_hacker_happy1_46x49;

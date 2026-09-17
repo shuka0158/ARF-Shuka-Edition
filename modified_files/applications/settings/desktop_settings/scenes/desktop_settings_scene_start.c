@@ -57,7 +57,7 @@ const uint32_t displayBatteryPercentage_value[BATTERY_VIEW_COUNT] = {
 
 #define PASSPORT_CHAR_COUNT 4
 const char* const passport_char_text[PASSPORT_CHAR_COUNT] = {
-    "Dolphin", "Skull", "Hacker", "Robot",
+    "Dolphin", "Skull", "Neuromancer", "Robot",
 };
 const uint32_t passport_char_value[PASSPORT_CHAR_COUNT] = {0, 1, 2, 3};
 
