@@ -122,15 +122,18 @@ static void passport_draw_callback(Canvas* canvas, void* ctx) {
     canvas_draw_str(canvas, 54, 23, furi_string_get_cstr(mood));
     furi_string_free(mood);
 
-    // XP bar toward next level (full and static once level 3 is reached)
+    // XP bar toward next level. At max level (dolphin ships preset there,
+    // see patch_dolphin_level.py) xp_span is 0 — a "full" bar would render
+    // as another solid black rectangle sitting right above the equally
+    // solid black Lvl. badge below, reading as a glitchy duplicate rather
+    // than two distinct elements, so leave it as an empty outline instead.
     const uint8_t bar_x = 54, bar_y = 30, bar_w = 70, bar_h = 6;
     canvas_draw_frame(canvas, bar_x, bar_y, bar_w, bar_h);
-    uint8_t fill = bar_w - 2;
     if(m->xp_span > 0) {
-        fill = (uint8_t)(((uint64_t)m->xp_above * (bar_w - 2)) / m->xp_span);
-    }
-    if(fill > 0) {
-        canvas_draw_box(canvas, bar_x + 1, bar_y + 1, fill, bar_h - 2);
+        uint8_t fill = (uint8_t)(((uint64_t)m->xp_above * (bar_w - 2)) / m->xp_span);
+        if(fill > 0) {
+            canvas_draw_box(canvas, bar_x + 1, bar_y + 1, fill, bar_h - 2);
+        }
     }
 
     canvas_set_color(canvas, ColorWhite);
