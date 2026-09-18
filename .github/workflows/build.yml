@@ -65,6 +65,27 @@ jobs:
           git submodule update --init --recursive --depth 1
           echo "ARF_TAG=${ARF_TAG:-HEAD}" >> "$GITHUB_ENV"
 
+      - name: Re-enable nfc/metroflip if upstream shipped them disabled
+        run: |
+          # Upstream ARF dev snapshots occasionally disable a whole family of
+          # apps by renaming application.fam -> application.fam.disabled
+          # (seen: a mid-refactor snapshot disabling ~28 NFC-related apps at
+          # once). Every later step in this workflow assumes application.fam
+          # exists at the standard path for "nfc" and "metroflip" specifically
+          # — those are the only two apps our own strip scripts touch — so
+          # restore just those two if disabled. Deliberately NOT touching the
+          # other ~26 disabled NFC-family apps: we have no evidence their code
+          # still compiles against whatever upstream is mid-changing, and
+          # re-enabling them blind risks trading one build failure for many.
+          for app in nfc metroflip; do
+            disabled="flipper-fw/applications/main/$app/application.fam.disabled"
+            [ -f "$disabled" ] || disabled="flipper-fw/applications/system/$app/application.fam.disabled"
+            if [ -f "$disabled" ]; then
+              mv "$disabled" "${disabled%.disabled}"
+              echo "  re-enabled: ${disabled%.disabled}"
+            fi
+          done
+
       - name: Stamp version string
         run: |
           echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
