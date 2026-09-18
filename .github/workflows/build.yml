@@ -338,6 +338,10 @@ jobs:
           # writeup of why this was needed and what was checked.
           REPO=flipper-fw
           SHUKA=shuka-edition
+          if [ ! -f "$REPO/applications/main/nfc/application.fam" ]; then
+            echo "NFC app disabled upstream — nothing to strip, skipping"
+            exit 0
+          fi
 
           # SDK public-API export table (the same file issue #8's CI guard
           # reads): scons cross-checks every `Header,+,<path>` row against a
@@ -442,6 +446,10 @@ jobs:
           # same way (lib/nfc protocol table + SDK header exports).
           REPO=flipper-fw
           SHUKA=shuka-edition
+          if [ ! -f "$REPO/applications/main/nfc/application.fam" ]; then
+            echo "NFC app disabled upstream — nothing to strip, skipping"
+            exit 0
+          fi
 
           sed -i '/emv/Id' "$REPO/targets/f7/api_symbols.csv"
 
@@ -504,6 +512,10 @@ jobs:
           # at least FeliCa.
           REPO=flipper-fw
           SHUKA=shuka-edition
+          if [ ! -f "$REPO/applications/main/nfc/application.fam" ]; then
+            echo "NFC app disabled upstream — nothing to guard, skipping"
+            exit 0
+          fi
           python3 "$SHUKA/scripts/patch_nfc_stripped_protocol_crash.py" \
             "$REPO/applications/main/nfc"
           echo "NFC stripped-protocol crash guard applied."
@@ -540,6 +552,10 @@ jobs:
           # Metroflip's Suica plugin and the aic.c NFC plugin.
           REPO=flipper-fw
           SHUKA=shuka-edition
+          if [ ! -f "$REPO/applications/main/nfc/application.fam" ]; then
+            echo "NFC app disabled upstream — nothing to strip, skipping"
+            exit 0
+          fi
 
           sed -i '/felica/Id' "$REPO/targets/f7/api_symbols.csv"
 
