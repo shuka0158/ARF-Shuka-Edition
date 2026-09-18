@@ -85,12 +85,6 @@ jobs:
               echo "  re-enabled: ${disabled%.disabled}"
             fi
           done
-          # Re-enabling the app manifest alone isn't enough: upstream's same
-          # disable action also dropped "nfc" from targets/f7/target.json's
-          # linker_dependencies, which is what actually causes lib/nfc to be
-          # built and linked into firmware.elf. Without this, link fails with
-          # "cannot find -lnfc" even though the app itself compiles fine.
-          python3 shuka-edition/scripts/relink_nfc_library.py flipper-fw
 
       - name: Stamp version string
         run: |
