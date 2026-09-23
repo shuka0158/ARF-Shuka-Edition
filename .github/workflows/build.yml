@@ -80,9 +80,13 @@ jobs:
         run: |
           # Only add apps that are truly absent from ARF — never overwrite ARF's own
           # version, because system FAPs (like cli_ikey) may depend on ARF's API.
-          CORE_APPS="applications/main/infrared applications/main/ibutton applications/main/bad_usb applications/main/u2f"
+          # Added: rfid (frid), gpio, and subghz_bruteforcer for full functionality
+          CORE_APPS="applications/main/infrared applications/main/ibutton applications/main/bad_usb applications/main/u2f applications/main/rfid applications/main/gpio"
+          SYSTEM_APPS="applications/system/subghz_bruteforcer"
           NEED=""
-          for app in infrared ibutton bad_usb u2f; do
+
+          # Check main apps
+          for app in infrared ibutton bad_usb u2f rfid gpio; do
             if [ ! -d "flipper-fw/applications/main/${app}" ]; then
               NEED="$NEED applications/main/${app}"
               echo "  missing: ${app} — will add from official firmware"
@@ -90,13 +94,26 @@ jobs:
               echo "  present: ${app} — keeping ARF's version"
             fi
           done
+
+          # Check system apps
+          for app in subghz_bruteforcer; do
+            if [ ! -d "flipper-fw/applications/system/${app}" ]; then
+              NEED="$NEED applications/system/${app}"
+              echo "  missing system app: ${app} — will add from official firmware"
+            else
+              echo "  present system app: ${app} — keeping ARF's version"
+            fi
+          done
+
           if [ -n "$NEED" ]; then
             git clone --depth 1 --filter=blob:none --sparse \
               https://github.com/flipperdevices/flipperzero-firmware.git flipper-official
             cd flipper-official
             git sparse-checkout set $NEED
             cd ..
-            for app in infrared ibutton bad_usb u2f; do
+
+            # Add main apps
+            for app in infrared ibutton bad_usb u2f rfid gpio; do
               dest="flipper-fw/applications/main/${app}"
               src="flipper-official/applications/main/${app}"
               if [ ! -d "$dest" ] && [ -d "$src" ]; then
@@ -104,6 +121,17 @@ jobs:
                 echo "  added: ${app}"
               fi
             done
+
+            # Add system apps
+            for app in subghz_bruteforcer; do
+              dest="flipper-fw/applications/system/${app}"
+              src="flipper-official/applications/system/${app}"
+              if [ ! -d "$dest" ] && [ -d "$src" ]; then
+                cp -r "$src" "$dest"
+                echo "  added system app: ${app}"
+              fi
+            done
+
             rm -rf flipper-official
           fi
           echo "Core apps patched OK"
@@ -306,7 +334,7 @@ jobs:
           # (older Corolla Verso/Tundra vs modern Toyota/Lexus 2003-2020),
           # so both coexisting is real coverage, not duplication.
           if [ "${{ matrix.variant }}" = "protocols" ]; then
-            REENABLE="came toyota"
+            REENABLE="came toyota princeton"
           else
             REENABLE=""
           fi
@@ -807,6 +835,16 @@ jobs:
 
           echo "External animation pack cleared — NSFW-only, injected post-build."
 
+
+      - name: Rebuild all FAPs against current firmware API
+        run: |
+          cd flipper-fw
+          # Ensure all FAPs (especially those pulled from official firmware) are
+          # rebuilt fresh against the current API version to avoid API mismatches.
+          # This is critical: FAPs pulled from official firmware might be from a
+          # different API generation, so we force a clean rebuild.
+          ./fbt clean_fap_dist 2>&1 | tee -a build_prep.log || true
+          echo "FAP build cache cleared, will rebuild fresh"
 
       - name: Build firmware
         run: |
