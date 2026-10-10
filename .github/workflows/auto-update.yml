@@ -2,8 +2,8 @@ name: Auto-sync ARF upstream
 
 on:
   schedule:
-    # Check for new ARF releases every 6 hours
-    - cron: '0 */6 * * *'
+    # Check for new ARF releases every hour
+    - cron: '0 * * * *'
   workflow_dispatch: {}   # allow manual trigger too
 
 jobs:
