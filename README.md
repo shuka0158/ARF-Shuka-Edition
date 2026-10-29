@@ -46,14 +46,14 @@ My Discord: @shuka0158
 
 ARF-Shuka-Edition is identical to upstream ARF plus **6 automotive protocols** and the **X10 home automation protocol** that ARF does not have:
 
-| Protocol | Brand coverage | Encoding | Frame |
-|---|---|---|---|
-| **GM Rolling** | Chevrolet, GMC, Buick, Cadillac (2000–2015) | Manchester | 64-bit, XOR checksum |
-| **Honda/Acura** | Honda Civic, CR-V, Accord (2007+) / Acura TL, MDX, RDX | PWM | 64-bit, CRC-8 0x2F |
-| **Hyundai New** | Hyundai all models (2017+), Genesis all models | PWM | 64-bit, CRC-8 0x31 |
-| **Nissan** | Nissan, Infiniti (2003–2018) | PWM | 64-bit, CRC-8 0x97 |
-| **Renault** | Renault, Dacia — Clio/Megane/Duster (2005–2020) | PCM biphase | 64-bit, XOR checksum |
-| **Toyota/Lexus** | Corolla, Camry, RAV4, Hilux, Land Cruiser, Lexus IS/RX/GS (2003–2020) | PWM | 72-bit, CRC-8 0xEA |
+| Protocol | Brand coverage | Modulation | Encoding | Frame |
+|---|---|---|---|---|
+| **GM Rolling** | Chevrolet, GMC, Buick, Cadillac (2000–2015) | OOK 315 MHz | Manchester | 64-bit, XOR checksum |
+| **Honda/Acura** | Honda Civic, CR-V, Accord (2007+) / Acura TL, MDX, RDX | OOK 433.05 MHz | PWM | 64-bit, CRC-8 0x2F |
+| **Hyundai New** | Hyundai all models (2017+), Genesis all models | OOK 433.05 MHz | PWM | 64-bit, CRC-8 0x31 |
+| **Nissan** | Nissan, Infiniti (2003–2018) | OOK 433.05 MHz | PWM | 64-bit, CRC-8 0x97 |
+| **Renault** | Renault, Dacia — Clio/Megane/Duster (2005–2020) | OOK 433.05 MHz | PCM biphase | 64-bit, XOR checksum |
+| **Toyota/Lexus** | Corolla, Camry, RAV4, Hilux, Land Cruiser, Lexus IS/RX/GS (2003–2020) | OOK 433.05 MHz | PWM | 72-bit, CRC-8 0xEA |
 
 > ARF already has a `toyota.c` covering older Corolla Verso (2004–2010) and Tundra (2011) variants.
 > Our `toyota_lexus.c` covers a different, newer frame format — both coexist in this firmware.
