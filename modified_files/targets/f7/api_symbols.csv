@@ -1,7 +1,7 @@
 entry,status,name,type,params
 Version,+,90.0,,
 Header,+,applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h,,
-Header,+,applications/drivers/subghz/si4463_ext/si4463_ext_interconnect.h,,
+Header,-,applications/drivers/subghz/si4463_ext/si4463_ext_interconnect.h,,
 Header,+,applications/services/applications.h,,
 Header,+,applications/services/bt/bt_service/bt.h,,
 Header,+,applications/services/bt/bt_service/bt_keys_storage.h,,
@@ -3489,7 +3489,7 @@ Function,+,subghz_custom_btn_set_page,void,uint8_t
 Function,+,subghz_custom_btn_set_pages,void,_Bool
 Function,+,subghz_custom_btns_reset,void,
 Function,-,subghz_device_cc1101_ext_ep,const FlipperAppPluginDescriptor*,
-Function,+,subghz_device_si4463_ext_ep,const FlipperAppPluginDescriptor*,
+Function,-,subghz_device_si4463_ext_ep,const FlipperAppPluginDescriptor*,
 Function,+,subghz_devices_begin,_Bool,const SubGhzDevice*
 Function,+,subghz_devices_deinit,void,
 Function,+,subghz_devices_end,void,const SubGhzDevice*
